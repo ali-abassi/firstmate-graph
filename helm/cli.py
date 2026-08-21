@@ -113,12 +113,10 @@ HARNESS = {
 }
 
 
-PI_HOME_SETTINGS = {
-    "defaultProvider": "openai-codex", "defaultModel": "gpt-5.6-sol", "defaultThinkingLevel": "medium",
-    "enabledModels": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-luna", "openai-codex/gpt-5.6-terra",
-                      "openai-codex/gpt-5.5", "openai-codex/gpt-5.4", "openai-codex/gpt-5.4-mini"],
-    "quietStartup": True,
-}
+# A default, not a cage: every model the login provides stays selectable (/model), and the
+# crew's per-step models live in dispatch.json, which the captain can change by asking.
+PI_HOME_SETTINGS = {"defaultProvider": "openai-codex", "defaultModel": "gpt-5.6-sol",
+                    "defaultThinkingLevel": "medium", "quietStartup": True}
 
 
 def pi_home() -> Path:
@@ -150,18 +148,21 @@ def cmd_setup(a):
     """Own config, own login: connect the first mate to the Codex subscription."""
     dst = _isolated_pi_home()
     dispatch.load()
-    if a.import_login:
+    if not codex_ready() and not getattr(a, "fresh", False):
+        # The captain has very likely logged Pi into Codex already: reuse that, don't ask twice.
         src = Path(os.environ.get("HELM_IMPORT_PI_DIR", "~/.pi/agent")).expanduser() / "auth.json"
         try:
             creds = json.loads(src.read_text()).get("openai-codex")
         except (OSError, json.JSONDecodeError):
             creds = None
-        if not creds:
+        if creds:
+            auth = dst / "auth.json"
+            current = json.loads(auth.read_text()) if auth.exists() else {}
+            current["openai-codex"] = creds
+            auth.write_text(json.dumps(current, indent=2) + "\n"); auth.chmod(0o600)
+            print(f"  ⚓ reusing your Codex login from {src.parent}", file=sys.stderr)
+        elif a.import_login:
             raise HelmError(f"no openai-codex login found in {src}")
-        auth = dst / "auth.json"
-        current = json.loads(auth.read_text()) if auth.exists() else {}
-        current["openai-codex"] = creds
-        auth.write_text(json.dumps(current, indent=2) + "\n"); auth.chmod(0o600)
     if codex_ready():
         out({"ready": True, "pi_home": str(dst)}, a.json, f"✓ connected to the Codex subscription · pi home {dst}")
         return
@@ -344,6 +345,17 @@ def cmd_daemon(a):
 
 def cmd_dispatch(a):
     cfg = dispatch.load()
+    if a.set:
+        from .util import write_json
+        from .paths import dispatch_file
+        for spec in a.set:
+            phase, _, model = spec.partition("=")
+            if phase not in dispatch.PHASES or "/" not in model:
+                raise HelmError(f"use --set PHASE=provider/model with PHASE in {dispatch.PHASES}")
+            cfg["models"][phase] = model
+        write_json(dispatch_file(), cfg)
+        print("models now: " + ", ".join(f"{k}={v}" for k, v in cfg["models"].items()))
+        return
     if a.json:
         return out(cfg, True)
     print(f"dispatch file: {dispatch_file()}")
@@ -412,9 +424,10 @@ def main(argv=None):
     p = S("run-once", cmd_run_once, "claim and execute one queued item"); p.add_argument("--owner", default="cli"); p.add_argument("--timeout", type=int, default=3600)
     p = S("daemon", cmd_daemon, "execute forever"); p.add_argument("--owner", default="daemon"); p.add_argument("--interval", type=int, default=20)
     p.add_argument("--timeout", type=int, default=3600); p.add_argument("--once-idle", type=int, default=0, help="exit after N idle polls (tests)")
-    S("dispatch", cmd_dispatch, "show dispatch table")
+    p = S("dispatch", cmd_dispatch, "show dispatch table"); p.add_argument("--set", action="append", metavar="PHASE=provider/model", help="change a step's default model")
     p = S("setup", cmd_setup, "connect the first mate to the Codex subscription (own config, own login)")
-    p.add_argument("--import-login", action="store_true", help="copy an existing Pi Codex login instead of logging in again")
+    p.add_argument("--import-login", action="store_true", help="(default behaviour) reuse the Codex login from your Pi")
+    p.add_argument("--fresh", action="store_true", help="ignore any existing Pi login and log in interactively")
     p = S("up", cmd_up, "start workers (herdr tabs when inside herdr, else background)"); p.add_argument("--interval", type=int, default=20)
     p.add_argument("--workers", type=int, default=2, help="worker tabs to open inside herdr")
     p = S("watch", cmd_watch, "live fleet board"); p.add_argument("--interval", type=float, default=2.0); p.add_argument("--once", action="store_true")

@@ -138,7 +138,7 @@ class OwnPiHomeTests(Isolated):
         self.assertFalse((dst / "auth.json").exists(), "no login is inherited silently")
         settings = json.loads((dst / "settings.json").read_text())
         self.assertEqual((settings["defaultProvider"], settings["defaultModel"]), ("openai-codex", "gpt-5.6-sol"))
-        self.assertTrue(all(m.startswith("openai-codex/") for m in settings["enabledModels"]))
+        self.assertNotIn("enabledModels", settings, "no model cage: the captain decides")
         (dst / "settings.json").write_text(json.dumps({"defaultModel": "mine", "defaultProvider": "x"}))
         _isolated_pi_home()                                   # second run keeps the captain's choice
         self.assertEqual(json.loads((dst / "settings.json").read_text())["defaultModel"], "mine")
@@ -154,3 +154,15 @@ class OwnPiHomeTests(Isolated):
                             "from helm import cli; cli.main(['status','--json']); print('DIR='+os.environ['PI_CODING_AGENT_DIR'])"],
                            cwd=str(REPO), env={**os.environ, "HELM_HOME": str(self.home)}, text=True, capture_output=True)
         self.assertIn(f"DIR={self.home.resolve()}/pi", r.stdout)
+
+
+class DispatchSetTests(Isolated):
+    def test_captain_can_change_a_steps_model(self):
+        r = subprocess.run([sys.executable, str(REPO / "bin" / "helm"), "dispatch", "--set", "implement=openai-codex/gpt-5.6-luna"],
+                           env={**os.environ, "HELM_HOME": str(self.home)}, text=True, capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stderr); self.assertIn("implement=openai-codex/gpt-5.6-luna", r.stdout)
+        from helm import dispatch
+        self.assertEqual(dispatch.load()["models"]["implement"], "openai-codex/gpt-5.6-luna")
+        r = subprocess.run([sys.executable, str(REPO / "bin" / "helm"), "dispatch", "--set", "bogus=x"],
+                           env={**os.environ, "HELM_HOME": str(self.home)}, text=True, capture_output=True)
+        self.assertEqual(r.returncode, 1)

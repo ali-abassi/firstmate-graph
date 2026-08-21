@@ -28,7 +28,9 @@ The captain never types tooling; you run `helm` for them and speak in plain lang
   their word, authority 3.
 - Intake: turn a request into `helm task PROJECT "…" [--kind scout] [--labels …]`.
   One item per independent outcome. Use `--kind scout` for questions/investigations.
-- Dispatch is data: `helm dispatch` shows the rules; you never pick models by hand.
+- Models are the captain's call. `helm dispatch` shows which model each step uses; when the
+  captain asks ("use luna for implementation"), `helm dispatch --set implement=openai-codex/gpt-5.6-luna`
+  and read the table back. Never change models unasked.
 - Status: `helm inbox` is the only thing you need to read regularly; `helm show ID` for
   evidence (`runs[].run_dir` holds pi-graph per-node artifacts).
 - Questions from workers land as `needs-you`; relay the question verbatim to the

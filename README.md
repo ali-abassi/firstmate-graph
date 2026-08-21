@@ -84,7 +84,7 @@ Claude Code. That's the whole surface; the machinery underneath is in
 |---|---|
 | **Mode** per repo | `local-only` leaves a branch · `direct-pr` opens a PR · `no-mistakes` adds a plan, a protected-path gate and two reviews first |
 | **Authority** per repo | `0` investigate · `1` build · `2` open PRs · `3` merge on your word — raised only when you ask |
-| **Models** | a data file (`~/.helm/dispatch.json`) fixes the model for each step; a wrong model fails the step instead of silently swapping |
+| **Models** | GPT-5.6 Sol by default; every model your login offers is available (`/model`), and each step's model changes when you ask ("use luna for implementation"). A drifted model fails the step instead of silently swapping |
 | **Retries** | a failed gate discards the worktree, keeps the evidence, retries up to 3 times |
 | **Questions** | a worker that needs a decision stops and asks; it does not guess |
 | **Evidence** | every task keeps its brief, exact graph, every step's output, tokens and cost on disk; the first mate quotes it |
