@@ -51,7 +51,7 @@ function rail(theme: Theme, w: number, noColor: boolean): string {
 }
 
 export function statusLine(s: Status | null): string {
-  if (!s) return "helm not reachable · run ./install.sh";
+  if (!s) return "crew tools missing · re-run install.sh";
   const workers = s.herdr_tabs?.some((t) => t.kind === "worker")
     ? `${s.herdr_tabs!.filter((t) => t.kind === "worker").length} workers in herdr tabs`
     : s.workers ? "workers in background" : "workers stopped";

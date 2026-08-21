@@ -72,7 +72,7 @@ class HelmTests(unittest.TestCase):
         it = self.show(it["id"])
         self.assertEqual(it["status"], "needs-you"); self.assertEqual(it["attempts"], 0)
         self.assertEqual(it["ask"]["question"], "Which auth provider?")
-        self.assertIn("helm respond", self.helm("inbox").stdout)
+        self.assertIn("[question]", self.helm("inbox").stdout)
         self.helm("respond", it["id"], "use oauth")
         self.assertEqual(self.show(it["id"])["status"], "queued")
         self.helm("run-once", mode="ok")
@@ -150,7 +150,7 @@ class HelmTests(unittest.TestCase):
         self.add(mode="local-only")
         it = self.task()
         self.helm("up", "--interval", "1")
-        self.assertIn("background (pid", self.helm("status").stdout)
+        self.assertIn("in the background", self.helm("status").stdout)
         deadline = time.time() + 30
         while time.time() < deadline and self.show(it["id"])["status"] != "ready":
             time.sleep(0.5)

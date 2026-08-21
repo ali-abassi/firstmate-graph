@@ -45,48 +45,48 @@ python3 -m unittest discover -s tests -v     # 16 tests, no tokens spent
 
 ```sh
 git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph && ~/firstmate-graph/install.sh
-helm setup          # one-time: log the first mate into your Codex subscription
+pi-firstmate
 ```
 
-Opinionated: it runs on the **Codex subscription** (GPT-5.6 Sol by default), in its own
-Pi config home (`~/.helm/pi`) with its own login — nothing from your personal Pi setup is
-inherited. Needs [pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`) and `pi`;
-`gh` only for PR modes. Other providers: `/login` inside `pi-firstmate`, then point phases
-at them in `~/.helm/dispatch.json`.
+The first run connects to your **Codex subscription** (GPT-5.6 Sol by default) in the
+first mate's own Pi home — nothing from your personal Pi setup is inherited. Needs
+[pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`) and `pi`; `gh` only if you
+want PRs.
 
 ## Use
 
-```sh
-helm add ~/code/api          # register a repo — test command and base branch auto-detected
-pi-firstmate                 # workers start in the background; Pi opens as your first mate
-```
-
-Then talk: *"fix the flaky login test in api, and find out why the web bundle is 4 MB."*
-It queues the work, tells you when something needs a decision, and merges only when you say so.
-Inside Pi, `/fleet` shows the board and `/inbox` what needs you — no model turn spent.
-
-**In [Herdr](https://herdr.dev)** the fleet is visible: `pi-firstmate` opens a *⚓ fleet* board
-tab and one tab per worker beside you, every running task gets its own tab following its
-log, and questions or finished work arrive as notifications. Outside Herdr, workers run
-in the background and `helm watch` is the board.
-
-Under the hood it's a small CLI the liaison uses for you:
+There is one command, and then you talk.
 
 ```sh
-helm status · helm inbox · helm respond ID "answer" · helm promote ID --confirm · helm down
+pi-firstmate
 ```
 
-`pi-firstmate claude` or `pi-firstmate codex` opens the same liaison in another harness.
+> **you:** add ~/code/api and ~/code/web
+> **first mate:** Registered both, captain — `api` runs `npm test`, `web` runs `pnpm test`. Local-only for now; say the word for PRs.
+>
+> **you:** fix the flaky login test in api, and find out why the web bundle is 4 MB
+> **first mate:** Two items under way. I'll report when they land or need a decision.
+>
+> *(later)* **first mate:** Captain — the login fix is ready on a branch, tests green. The bundle scout wants to know: is the analytics SDK required in production?
+> **you:** no, drop it. merge the login fix.
+> **first mate:** Merged `api` to main. Guidance passed to the scout; it's back under way.
+
+Inside Pi: `/fleet` shows the board, `/inbox` what needs you. In [Herdr](https://herdr.dev)
+you also get a `⚓ fleet` tab, a tab per worker, a tab per running task, and notifications.
+
+`pi-firstmate stop` stops the crew. `pi-firstmate claude` opens the same first mate in
+Claude Code. That's the whole surface; the machinery underneath is in
+[`docs/cli.md`](docs/cli.md) for the curious.
 
 ## Rules
 
 | | |
 |---|---|
 | **Mode** per repo | `local-only` leaves a branch · `direct-pr` opens a PR · `no-mistakes` adds a plan, a protected-path gate and two reviews first |
-| **Authority** per repo | `0` investigate · `1` build · `2` open PRs · `3` merge on `--confirm` — only you raise it |
-| **Dispatch** | a data file picks the graph and the model for each step; a wrong model fails the step |
+| **Authority** per repo | `0` investigate · `1` build · `2` open PRs · `3` merge on your word — raised only when you ask |
+| **Models** | a data file (`~/.helm/dispatch.json`) fixes the model for each step; a wrong model fails the step instead of silently swapping |
 | **Retries** | a failed gate discards the worktree, keeps the evidence, retries up to 3 times |
 | **Questions** | a worker that needs a decision stops and asks; it does not guess |
-| **Evidence** | `~/.helm/work/<id>/` — brief, exact graph, every step's output, tokens, cost |
+| **Evidence** | every task keeps its brief, exact graph, every step's output, tokens and cost on disk; the first mate quotes it |
 
 MIT.

@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
-# Open the first mate in Pi: starts background workers, then launches pi as the liaison.
-# Usage: pi-firstmate              (pi)        pi-firstmate claude | codex   (other harnesses)
-exec "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0")")/helm" captain "${1:-pi}"
+# pi-firstmate — the only command you need.
+#   pi-firstmate            open the first mate (workers start by themselves)
+#   pi-firstmate stop       stop the workers
+#   pi-firstmate status     one-screen fleet board
+#   pi-firstmate setup      connect to your Codex subscription (runs automatically the first time)
+#   pi-firstmate claude     open the first mate in Claude Code instead of Pi (also: codex)
+helm="$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0")")/helm"
+case "${1:-}" in
+  -h|--help|help) sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  stop)   exec "$helm" down ;;
+  status) exec "$helm" watch --once ;;
+  setup)  shift; exec "$helm" setup "$@" ;;
+  "")     exec "$helm" captain pi ;;
+  *)      exec "$helm" captain "$@" ;;
+esac

@@ -18,9 +18,9 @@ def render(workers_pid: int | None, width: int | None = None) -> str:
     items = work.all_items()
     open_items = [i for i in items if i["status"] in work.OPEN]
     lines = []
-    where = "herdr tabs" if os.environ.get("HERDR_ENV") == "1" else f"background (pid {workers_pid})" if workers_pid else "stopped — helm up"
+    where = "in herdr tabs" if os.environ.get("HERDR_ENV") == "1" else "in the background" if workers_pid else "stopped"
     lines.append(f"  workers   {where}")
-    lines.append(f"  projects  {len(projects)}" + ("   " + " · ".join(f"{p['id']} [{p['mode']}/a{p['authority']}]" for p in list(projects.values())[:6]) if projects else "   → helm add PATH"))
+    lines.append(f"  projects  {len(projects)}" + ("   " + " · ".join(f"{p['id']} [{p['mode']}/a{p['authority']}]" for p in list(projects.values())[:6]) if projects else '   none yet — say: "add ~/code/my-repo"'))
     needs = [i for i in items if i["status"] in ("needs-you", "failed", "ready", "pr-open")]
     lines.append(f"  inbox     {len(needs)} need you" if needs else "  inbox     clear")
     if open_items:

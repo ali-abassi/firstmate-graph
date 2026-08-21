@@ -80,7 +80,7 @@ class HerdrTests(unittest.TestCase):
 
     def test_banner_and_watch_once(self):
         out = self.helm("watch", "--once").stdout
-        self.assertIn("F I R S T   M A T E", out); self.assertIn("workers   herdr tabs", out); self.assertIn("→ helm add PATH", out)
+        self.assertIn("F I R S T   M A T E", out); self.assertIn("workers   in herdr tabs", out); self.assertIn("none yet", out)
 
 
 if __name__ == "__main__":

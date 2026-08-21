@@ -77,7 +77,7 @@ def _up_herdr(a):
         if t:
             herdr.remember("worker", t); opened.append(t)
     if not opened:
-        raise HelmError("could not open herdr tabs (see helm.log); falling back: run `helm daemon` in a tab yourself")
+        raise HelmError("could not open herdr tabs (see ~/.helm/helm.log)")
     out({"tabs": opened}, a.json, f"opened {len(opened)} herdr tabs: " + ", ".join(t["label"] for t in opened))
 
 
@@ -166,14 +166,14 @@ def cmd_setup(a):
         out({"ready": True, "pi_home": str(dst)}, a.json, f"✓ connected to the Codex subscription · pi home {dst}")
         return
     if a.json or not sys.stdin.isatty():
-        raise HelmError("not logged in to Codex. Run `helm setup` in a terminal, or `helm setup --import-login` to copy an existing Pi login")
+        raise HelmError("not connected to Codex yet — run `pi-firstmate setup` in a terminal")
     print("\n  ⚓ one-time setup — connect the first mate to your Codex subscription\n"
           "     Pi will open. Type  /login  and choose  OpenAI Codex , finish in the browser, then  /exit\n", file=sys.stderr)
     subprocess.run(["pi"], env={**os.environ, "PI_CODING_AGENT_DIR": str(dst)}, cwd=str(dst))
     if codex_ready():
         out({"ready": True, "pi_home": str(dst)}, False, f"✓ connected to the Codex subscription · pi home {dst}")
     else:
-        raise HelmError("still not logged in to Codex; run `helm setup` again")
+        raise HelmError("still not connected to Codex — run `pi-firstmate setup` again")
 
 
 def cmd_captain(a):
@@ -188,7 +188,7 @@ def cmd_captain(a):
     if a.harness == "pi":
         if not codex_ready():
             cmd_setup(argparse.Namespace(json=False, import_login=False))
-        print(f"  ⚓ workers {'in herdr tabs' if herdr.inside() else 'up'} · first mate coming on deck…", file=sys.stderr)
+        print("  ⚓ crew ready · first mate coming on deck…", file=sys.stderr)
     else:
         print(board.banner(daemon_pid()))
         print(f"  first mate: {' '.join(cmd)}\n", file=sys.stderr)
@@ -272,13 +272,18 @@ def cmd_inbox(a):
     if not items:
         print("nothing needs you")
     for i in items:
+        title = i["text"].splitlines()[0][:60]
         if i["status"] == "needs-you":
-            print(f"[ask]    {i['id']}\n         Q: {(i.get('ask') or {}).get('question')}\n         → helm respond {i['id']} \"...\"")
+            print(f"[question]  {i['project']}: {title}\n            {(i.get('ask') or {}).get('question')}")
+            if a.hints: print(f"            → helm respond {i['id']} \"…\"")
         elif i["status"] == "failed":
             last = (i["failure_notes"] or [{}])[-1].get("notes", "")[:300].replace("\n", " ")
-            print(f"[failed] {i['id']}  {last}\n         → helm respond {i['id']} \"guidance\"  |  helm retry {i['id']}")
+            print(f"[failed]    {i['project']}: {title}\n            {last}")
+            if a.hints: print(f"            → helm respond {i['id']} \"guidance\"  |  helm retry {i['id']}")
         else:
-            print(f"[{i['status']}] {i['id']}  {i.get('pr_url') or i['branch']}\n         → helm promote {i['id']} --confirm")
+            what = i.get("pr_url") or f"branch {i['branch']}"
+            print(f"[{i['status']}]{' ' * max(1, 11 - len(i['status']) - 2)}{i['project']}: {title}\n            {what} — say \"merge it\" to promote")
+            if a.hints: print(f"            → helm promote {i['id']} --confirm")
 
 
 def cmd_respond(a):
@@ -399,7 +404,7 @@ def main(argv=None):
     p.add_argument("--labels", help="comma-separated dispatch labels, e.g. cheap,hard"); p.add_argument("--max-attempts", type=int, default=3)
     p = S("work", cmd_work, "list work items"); p.add_argument("--all", action="store_true")
     p = S("show", cmd_show, "show one item with history"); p.add_argument("id")
-    S("inbox", cmd_inbox, "what needs the captain")
+    p = S("inbox", cmd_inbox, "what needs the captain"); p.add_argument("--hints", action="store_true", help="show the helm commands (for the first mate)")
     p = S("respond", cmd_respond, "answer a question / give guidance, requeue"); p.add_argument("id"); p.add_argument("guidance", nargs="+")
     p = S("retry", cmd_retry, "requeue a failed item"); p.add_argument("id")
     p = S("cancel", cmd_cancel, "cancel an item"); p.add_argument("id"); p.add_argument("--discard", action="store_true")

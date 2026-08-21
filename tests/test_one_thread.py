@@ -90,12 +90,12 @@ class OneThreadTest(unittest.TestCase):
         self.assertEqual(owners, {"leased by worker-1", "leased by worker-2"})
 
         # 4. One channel back. Everything the captain needs is in the single inbox — nowhere else.
-        inbox = self.helm("inbox").stdout
+        inbox = self.helm("inbox", "--hints").stdout   # the first mate reads it with ids
         self.assertIn("Which auth provider?", inbox)
         for i in ids:
             if by_id[i]["status"] in ("ready", "needs-you"):
                 self.assertIn(i, inbox)
-        self.assertEqual(inbox.count("[ask]"), 1)
+        self.assertEqual(inbox.count("[question]"), 1)
         self.assertEqual(inbox.count("[ready]"), 3)
         # Scout reports land as files the liaison can read back; they are not chat.
         for i in ids:

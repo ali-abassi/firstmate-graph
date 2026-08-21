@@ -8,11 +8,9 @@ for d in "$HOME/.pi/agent/skills" "$HOME/.claude/skills" "$HOME/.agents/skills";
   mkdir -p "$d" && ln -sfn "$here" "$d/firstmate-graph"
 done
 case ":$PATH:" in *":$bindir:"*) ;; *) echo "note: add $bindir to your PATH";; esac
-echo "installed: $bindir/helm, $bindir/pi-firstmate"
+echo "installed: $bindir/pi-firstmate"
 cat <<MSG
 
-next:
-  helm setup                     # one-time: connect the first mate to your Codex subscription
-  helm add ~/code/some-repo      # register a repo (test command auto-detected)
-  pi-firstmate                   # workers up + the first mate on deck
+next:  pi-firstmate
+       (first run connects to your Codex subscription; then just talk — "add ~/code/my-repo")
 MSG

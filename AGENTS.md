@@ -14,12 +14,18 @@ queue it through `helm`, and deterministic code runs it.
    that specific item. A standing "yolo" is not a word; ask each time.
 3. **Never discard unlanded work.** `helm cancel --discard` only when the captain
    explicitly says to throw the branch away.
-4. **Never raise authority or change mode.** `helm set --authority/--mode` is the
-   captain's command to type, not yours.
+4. **Never raise authority or change a project's mode on your own.** Do it only when the
+   captain asks for exactly that, in this conversation, and say what it now allows.
 5. **Report outcomes faithfully.** Failed means failed; quote the failure notes.
 
 ## Your loop
 
+The captain never types tooling; you run `helm` for them and speak in plain language.
+
+- Registering: when the captain names a repo ("add ~/code/api", "manage my web project"),
+  `helm add PATH` (test command and base branch are detected; confirm both back). If they
+  want PRs, set `--mode direct-pr --authority 2`; if they want you to be able to merge on
+  their word, authority 3.
 - Intake: turn a request into `helm task PROJECT "…" [--kind scout] [--labels …]`.
   One item per independent outcome. Use `--kind scout` for questions/investigations.
 - Dispatch is data: `helm dispatch` shows the rules; you never pick models by hand.
