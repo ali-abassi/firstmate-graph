@@ -2,13 +2,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
-from . import registry, dispatch, work, deliver, worktree, __version__
+from . import registry, dispatch, work, deliver, worktree, herdr, board, __version__
 from .paths import home, projects_file, dispatch_file, work_root, GRAPHS
 from .util import HelmError, log
 
@@ -43,23 +44,48 @@ def daemon_pid():
         return None
 
 
+HELM_BIN = str(Path(__file__).resolve().parents[1] / "bin" / "helm")
+
+
 def cmd_up(a):
+    home().mkdir(parents=True, exist_ok=True)
+    if herdr.inside():
+        return _up_herdr(a)
     if daemon_pid():
         out({"pid": daemon_pid()}, a.json, f"workers already running (pid {daemon_pid()})")
         return
-    home().mkdir(parents=True, exist_ok=True)
     logf = open(home() / "daemon.log", "ab")
-    p = subprocess.Popen([sys.executable, str(Path(__file__).resolve().parents[1] / "bin" / "helm"), "daemon",
-                          "--owner", f"worker-{os.getpid()}", "--interval", str(a.interval)],
+    p = subprocess.Popen([sys.executable, HELM_BIN, "daemon", "--owner", f"worker-{os.getpid()}", "--interval", str(a.interval)],
                          stdin=subprocess.DEVNULL, stdout=logf, stderr=logf, start_new_session=True, env=os.environ)
     _pid_file().write_text(str(p.pid))
     out({"pid": p.pid}, a.json, f"workers running (pid {p.pid}) · log {home() / 'daemon.log'}")
 
 
+def _up_herdr(a):
+    """Inside Herdr: a fleet board tab plus one tab per worker, beside the captain."""
+    from .util import read_json
+    existing = read_json(home() / "herdr.json", {"tabs": []})["tabs"]
+    if any(t["kind"] == "worker" for t in existing):
+        out({"tabs": existing}, a.json, f"workers already open in herdr ({sum(t['kind']=='worker' for t in existing)} tabs)")
+        return
+    opened = []
+    t = herdr.open_tab("⚓ fleet", f"{shlex.quote(HELM_BIN)} watch")
+    if t:
+        herdr.remember("board", t); opened.append(t)
+    for n in range(1, a.workers + 1):
+        t = herdr.open_tab(f"worker {n}", f"{shlex.quote(HELM_BIN)} daemon --owner worker-{n} --interval {min(a.interval, 5)}")
+        if t:
+            herdr.remember("worker", t); opened.append(t)
+    if not opened:
+        raise HelmError("could not open herdr tabs (see helm.log); falling back: run `helm daemon` in a tab yourself")
+    out({"tabs": opened}, a.json, f"opened {len(opened)} herdr tabs: " + ", ".join(t["label"] for t in opened))
+
+
 def cmd_down(a):
+    closed = herdr.close_all() if (home() / "herdr.json").exists() else 0
     pid = daemon_pid()
     if not pid:
-        out({"stopped": False}, a.json, "workers not running")
+        out({"stopped": False, "tabs_closed": closed}, a.json, f"closed {closed} herdr tabs" if closed else "workers not running")
         return
     os.killpg(os.getpgid(pid), signal.SIGTERM)
     _pid_file().unlink(missing_ok=True)
@@ -72,12 +98,12 @@ def cmd_status(a):
     for i in items:
         counts[i["status"]] = counts.get(i["status"], 0) + 1
     pid = daemon_pid()
-    data = {"workers": pid, "projects": len(registry.load()["projects"]), "items": counts}
+    from .util import read_json
+    tabs = read_json(home() / "herdr.json", {"tabs": []})["tabs"]
+    data = {"workers": pid, "herdr_tabs": tabs, "projects": len(registry.load()["projects"]), "items": counts}
     if a.json:
         return out(data, True)
-    print(f"workers: {'running (pid %d)' % pid if pid else 'stopped  → helm up'}")
-    print(f"projects: {data['projects']}  → helm projects")
-    print("work: " + (", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "none") + "  → helm work / helm inbox")
+    print(board.render(pid))
 
 
 HARNESS = {
@@ -88,16 +114,40 @@ HARNESS = {
 
 
 def cmd_captain(a):
-    """One command: workers up, then the liaison in front of you."""
-    if not daemon_pid():
-        cmd_up(argparse.Namespace(json=False, interval=20))
+    """One command: workers up, banner, then the liaison in front of you."""
     cmd = HARNESS.get(a.harness) or [a.harness]
     if not shutil.which(cmd[0]):
         raise HelmError(f"{cmd[0]} is not on PATH")
+    from .util import read_json
+    have_tabs = any(t["kind"] == "worker" for t in read_json(home() / "herdr.json", {"tabs": []})["tabs"])
+    if not daemon_pid() and not (herdr.inside() and have_tabs):
+        cmd_up(argparse.Namespace(json=False, interval=20, workers=a.workers))
+    print(board.banner(daemon_pid()))
+    print(f"  first mate: {' '.join(cmd)}\n", file=sys.stderr)
     repo = Path(__file__).resolve().parents[1]
-    print(f"liaison: {' '.join(cmd)}  (in {repo})", file=sys.stderr)
     os.chdir(repo)
     os.execvp(cmd[0], cmd)
+
+
+def cmd_watch(a):
+    board.watch(a.interval, once=a.once)
+
+
+def cmd_tail(a):
+    """Follow a work item's live run log (used by per-task herdr tabs)."""
+    d = work.item_dir(a.id)
+    print(f"{a.id} — waiting for the run to start…")
+    deadline = time.time() + 120
+    logf = None
+    while time.time() < deadline and not logf:
+        runs = sorted((d / "runs").glob("*/log.md")) if (d / "runs").exists() else []
+        logf = runs[-1] if runs else None
+        if not logf:
+            time.sleep(1)
+    if not logf:
+        print("no run started within 120s"); return
+    print(f"following {logf}\n")
+    os.execvp("tail", ["tail", "-n", "+1", "-F", str(logf)])
 
 
 def cmd_set(a):
@@ -289,11 +339,15 @@ def main(argv=None):
     p = S("daemon", cmd_daemon, "execute forever"); p.add_argument("--owner", default="daemon"); p.add_argument("--interval", type=int, default=20)
     p.add_argument("--timeout", type=int, default=3600); p.add_argument("--once-idle", type=int, default=0, help="exit after N idle polls (tests)")
     S("dispatch", cmd_dispatch, "show dispatch table")
-    p = S("up", cmd_up, "start background workers"); p.add_argument("--interval", type=int, default=20)
+    p = S("up", cmd_up, "start workers (herdr tabs when inside herdr, else background)"); p.add_argument("--interval", type=int, default=20)
+    p.add_argument("--workers", type=int, default=2, help="worker tabs to open inside herdr")
+    p = S("watch", cmd_watch, "live fleet board"); p.add_argument("--interval", type=float, default=2.0); p.add_argument("--once", action="store_true")
+    p = S("tail", cmd_tail, "follow one item's run log"); p.add_argument("id")
     S("down", cmd_down, "stop background workers")
     S("status", cmd_status, "workers, projects, queue at a glance")
     p = S("captain", cmd_captain, "start workers and open the liaison (pi by default)")
     p.add_argument("harness", nargs="?", default="pi", help="pi | claude | codex | any command")
+    p.add_argument("--workers", type=int, default=2)
     p = S("doctor", cmd_doctor, "check tools, models, graphs"); p.add_argument("--probe", action="store_true", help="live 1-word call per model (costs a few tokens)")
     a = ap.parse_args(argv)
     try:

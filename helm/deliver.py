@@ -54,7 +54,8 @@ def promote(it: dict, project: dict, confirm: bool) -> str:
     current = git(repo, "symbolic-ref", "--short", "HEAD", check=False)
     if current != project["base"]:
         raise HelmError(f"{repo} is on '{current}', not base '{project['base']}'")
-    r = sh(["git", "-C", str(repo), "merge", "--ff-only", it["branch"]], check=False)
+    from .util import GIT_OPTS
+    r = sh(["git", *GIT_OPTS, "-C", str(repo), "merge", "--ff-only", it["branch"]], check=False)
     if r.returncode != 0:
         raise HelmError(f"fast-forward refused (base moved?): {r.stderr.strip()} — re-queue with `helm respond`")
     head = git(repo, "rev-parse", "--short", "HEAD")

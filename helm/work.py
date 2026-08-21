@@ -11,7 +11,7 @@ import secrets
 import shutil
 import time
 from pathlib import Path
-from . import dispatch, graphs, registry, worktree, deliver
+from . import dispatch, graphs, registry, worktree, deliver, herdr
 from .paths import work_root, home
 from .util import read_json, write_json, locked, now, log, HelmError
 
@@ -138,7 +138,18 @@ def _execute(it: dict, timeout: int) -> dict:
                           models=dp["models"], thinking=dp["thinking"], timeout=timeout)
     graphs.validate(steps)
     env = worktree.git_env(wt, d / "gitexclude")
-    summary = graphs.run(steps, brief, timeout + 60, env=env)
+    tab = None
+    if herdr.inside():
+        import shlex, sys
+        tab = herdr.open_tab(f"⚙ {project['id']}: {it['text'].splitlines()[0][:28]}",
+                             f"{shlex.quote(str(Path(__file__).resolve().parents[1] / 'bin' / 'helm'))} tail {it['id']}")
+        if tab:
+            herdr.remember("task", {**tab, "item": it["id"]})
+    try:
+        summary = graphs.run(steps, brief, timeout + 60, env=env)
+    finally:
+        if tab:
+            herdr.close_tab(tab["tab_id"]); herdr.forget(tab["tab_id"])
     it["attempts"] += 1
     it["runs"].append({"attempt": it["attempts"], "at": now(), "ok": bool(summary.get("ok")),
                        "run_dir": summary.get("run_dir"), "failed_ids": summary.get("failed_ids"),
@@ -153,6 +164,7 @@ def _execute(it: dict, timeout: int) -> dict:
             it["ask"] = {"question": ask_file.read_text()[:2000]}
         it["attempts"] -= 1                      # asking is not a failed attempt
         transition(it, "needs-you", it["ask"].get("question", "")[:120])
+        herdr.notify(f"{project['id']} needs you", it["ask"].get("question", "")[:160])
         return it
 
     if summary.get("ok"):
@@ -167,6 +179,7 @@ def _execute(it: dict, timeout: int) -> dict:
             transition(it, "failed", "graph passed but produced no commits")
             return it
         deliver.after_success(it, project, wt)
+        herdr.notify(f"{project['id']}: {it['status']}", it["text"].splitlines()[0][:120])
         return it
 
     notes = graphs.failure_notes(summary)
@@ -176,6 +189,7 @@ def _execute(it: dict, timeout: int) -> dict:
         transition(it, "queued", f"attempt {it['attempts']} failed ({','.join(summary.get('failed_ids') or [])}); requeued")
     else:
         transition(it, "failed", f"exhausted {it['max_attempts']} attempts")
+        herdr.notify(f"{project['id']}: failed", it["text"].splitlines()[0][:120])
     return it
 
 

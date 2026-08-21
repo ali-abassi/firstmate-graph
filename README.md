@@ -60,6 +60,12 @@ pi-firstmate                 # workers start in the background; Pi opens as your
 
 Then talk: *"fix the flaky login test in api, and find out why the web bundle is 4 MB."*
 It queues the work, tells you when something needs a decision, and merges only when you say so.
+Inside Pi, `/fleet` shows the board and `/inbox` what needs you — no model turn spent.
+
+**In [Herdr](https://herdr.dev)** the fleet is visible: `pi-firstmate` opens a *⚓ fleet* board
+tab and one tab per worker beside you, every running task gets its own tab following its
+log, and questions or finished work arrive as notifications. Outside Herdr, workers run
+in the background and `helm watch` is the board.
 
 Under the hood it's a small CLI the liaison uses for you:
 

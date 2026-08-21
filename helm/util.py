@@ -48,8 +48,14 @@ def sh(args: list[str], cwd: Path | str | None = None, check: bool = True,
                           capture_output=True, env=env, timeout=timeout)
 
 
+# Git options helm always applies to its own git calls. A global `core.fsmonitor=true`
+# starts a watcher daemon per repository and `git worktree add` can block forever on it
+# for a fresh worktree; helm's worktrees are short-lived, so the watcher buys nothing.
+GIT_OPTS = ["-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false"]
+
+
 def git(repo: Path | str, *args: str, check: bool = True) -> str:
-    return sh(["git", "-C", str(repo), *args], check=check).stdout.strip()
+    return sh(["git", *GIT_OPTS, "-C", str(repo), *args], check=check).stdout.strip()
 
 
 def log(msg: str) -> None:

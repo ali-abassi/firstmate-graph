@@ -40,9 +40,11 @@ def git_env(wt: Path, exclude_file: Path, base_env: dict | None = None) -> dict:
     names = [n for n in DEP_DIRS if (wt / n).is_symlink()]
     exclude_file.write_text("".join(f"/{n}\n" for n in names) + "/.helm-ask.json\n")
     count = int(env.get("GIT_CONFIG_COUNT", "0") or 0)
-    env[f"GIT_CONFIG_KEY_{count}"] = "core.excludesFile"
-    env[f"GIT_CONFIG_VALUE_{count}"] = str(exclude_file)
-    env["GIT_CONFIG_COUNT"] = str(count + 1)
+    for key, value in (("core.excludesFile", str(exclude_file)), ("core.fsmonitor", "false"), ("core.untrackedCache", "false")):
+        env[f"GIT_CONFIG_KEY_{count}"] = key
+        env[f"GIT_CONFIG_VALUE_{count}"] = value
+        count += 1
+    env["GIT_CONFIG_COUNT"] = str(count)
     return env
 
 
