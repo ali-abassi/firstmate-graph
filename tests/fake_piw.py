@@ -22,7 +22,20 @@ run_dir.mkdir(parents=True)
 brief = Path(argv[argv.index("--input-file") + 1]).read_text()
 (run_dir / "input.txt").write_text(brief)
 mode = os.environ.get("FAKE_PIW_MODE", "ok")
+# Per-item behaviour can be requested from inside the brief, so one daemon can serve a mixed queue.
+for marker in ("ask", "fail", "ok"):
+    if f"[fake:{marker}]" in brief:
+        mode = marker
+if mode == "ask" and "Captain guidance" in brief:
+    mode = "ok"          # the question was answered; a real worker would proceed too
+if "workflow: helm-scout" in text:
+    mode = "scout"
 (run_dir / "mode.txt").write_text(mode)
+# Evidence for concurrency assertions: when this "worker" started and finished, and where.
+started = time.time()
+work_seconds = float(os.environ.get("FAKE_PIW_SECONDS", "0"))
+time.sleep(work_seconds)
+(run_dir / "worker.json").write_text(json.dumps({"cwd": cwd, "started": started, "finished": time.time(), "pid": os.getpid()}))
 
 def done(ok, failed):
     print(json.dumps({"ok": ok, "passed": 1, "failed": len(failed), "cached": 0, "skipped": 0,
