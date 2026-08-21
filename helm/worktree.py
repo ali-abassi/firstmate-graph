@@ -9,7 +9,7 @@ from .util import git, HelmError
 
 
 def branch_name(work_id: str) -> str:
-    return f"helm/{work_id}"
+    return f"firstmate/{work_id}"
 
 
 def create(project: dict, work_id: str) -> Path:

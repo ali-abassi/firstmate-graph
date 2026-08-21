@@ -1,4 +1,5 @@
 """Unit tests for the decisions helm makes without a model: dispatch, rendering, authority."""
+import _gitenv  # noqa: F401  (git hygiene for temp repos)
 import json, os, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 

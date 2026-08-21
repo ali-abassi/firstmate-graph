@@ -1,3 +1,4 @@
+import _gitenv  # noqa: F401  (git hygiene for temp repos)
 import json, os, subprocess, sys, tempfile, time, unittest
 from pathlib import Path
 

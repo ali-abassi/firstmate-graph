@@ -7,6 +7,7 @@ daemon processes pick them up concurrently. One worker needs a human decision; i
 guess. The liaison sees that — and everything else — in a single inbox, answers once, and
 the work completes. Nobody touches the captain's checkouts until the captain says so.
 """
+import _gitenv  # noqa: F401  (git hygiene for temp repos)
 import json, os, subprocess, sys, tempfile, time, unittest
 from pathlib import Path
 

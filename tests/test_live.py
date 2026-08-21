@@ -3,6 +3,7 @@
 Spends a few cents on the cheapest configured model. Writes what happened to
 docs/evidence/live-run.md so the repo carries a dated record of a real run.
 """
+import _gitenv  # noqa: F401  (git hygiene for temp repos)
 import json, os, shutil, subprocess, sys, tempfile, time, unittest
 from pathlib import Path
 
