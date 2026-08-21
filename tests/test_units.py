@@ -124,3 +124,21 @@ class PiExtensionTests(unittest.TestCase):
         agents = (REPO / "AGENTS.md").read_text()
         self.assertIn('"captain"', agents)
         self.assertIn("promote", agents)
+
+
+class IsolatedPiHomeTests(Isolated):
+    def test_first_mate_gets_its_own_pi_home_with_only_auth_linked(self):
+        src = self.home / "captain-pi"; src.mkdir()
+        (src / "auth.json").write_text("{}"); (src / "models.json").write_text("{}")
+        (src / "AGENTS.md").write_text("# personal agent"); (src / "extensions").mkdir()
+        os.environ["PI_CODING_AGENT_DIR"] = str(src)
+        from helm.cli import _isolated_pi_home
+        dst = _isolated_pi_home()
+        self.assertTrue((dst / "auth.json").is_symlink() and (dst / "models.json").is_symlink())
+        self.assertFalse((dst / "AGENTS.md").exists()); self.assertFalse((dst / "extensions").exists())
+        settings = json.loads((dst / "settings.json").read_text())
+        self.assertEqual((settings["defaultProvider"], settings["defaultModel"]), ("openai-codex", "gpt-5.5"))
+        (dst / "settings.json").write_text(json.dumps({"defaultModel": "mine", "defaultProvider": "x"}))
+        _isolated_pi_home()                                   # second run keeps the captain's choice
+        self.assertEqual(json.loads((dst / "settings.json").read_text())["defaultModel"], "mine")
+        del os.environ["PI_CODING_AGENT_DIR"]

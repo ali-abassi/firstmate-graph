@@ -113,6 +113,31 @@ HARNESS = {
 }
 
 
+def _isolated_pi_home() -> Path:
+    """A Pi config dir that belongs to the first mate alone.
+
+    Nothing from the captain's personal Pi setup (extensions, AGENTS.md, prompts, skills,
+    themes) is inherited. Only credentials and the model catalog are linked in, so the
+    providers the captain already logged into keep working. Project-local files in this
+    repo (AGENTS.md, .pi/extensions/firstmate.ts) are what make it the first mate.
+    """
+    src = Path(os.environ.get("PI_CODING_AGENT_DIR", "~/.pi/agent")).expanduser()
+    dst = home() / "pi"
+    dst.mkdir(parents=True, exist_ok=True)
+    for name in ("auth.json", "models.json", "models-store.json"):
+        link = dst / name
+        if (src / name).exists() and not link.exists():
+            link.symlink_to(src / name)
+    (dst / "README").write_text("first mate's private Pi home — managed by helm; only auth/models are linked from your Pi.\n")
+    settings = dst / "settings.json"
+    current = json.loads(settings.read_text()) if settings.exists() else {}
+    if "defaultModel" not in current:                      # seed once; the captain's later choices stick
+        provider, model = dispatch.load()["models"]["plan"].split("/", 1)
+        current.update({"defaultProvider": provider, "defaultModel": model, "defaultThinkingLevel": "medium", "quietStartup": True})
+        settings.write_text(json.dumps(current, indent=2) + "\n")
+    return dst
+
+
 def cmd_captain(a):
     """One command: workers up, banner, then the liaison in front of you."""
     cmd = HARNESS.get(a.harness) or [a.harness]
@@ -123,6 +148,7 @@ def cmd_captain(a):
     if not daemon_pid() and not (herdr.inside() and have_tabs):
         cmd_up(argparse.Namespace(json=False, interval=20, workers=a.workers))
     if a.harness == "pi":
+        os.environ["PI_CODING_AGENT_DIR"] = str(_isolated_pi_home())
         print(f"  ⚓ workers {'in herdr tabs' if herdr.inside() else 'up'} · first mate coming on deck…", file=sys.stderr)
     else:
         print(board.banner(daemon_pid()))
