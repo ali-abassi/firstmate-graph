@@ -42,33 +42,30 @@ python3 -m unittest discover -s tests -v     # 16 tests, no tokens spent
 ## Install
 
 ```sh
-git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph
-ln -sf ~/firstmate-graph/bin/helm ~/.local/bin/helm
-helm doctor --probe
+git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph && ~/firstmate-graph/install.sh
 ```
 
-Needs [pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`), `pi` logged in to a
-provider, and `gh` for PR modes. Defaults use the Codex subscription and DeepSeek;
+Needs [pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`) and `pi` logged in to a
+provider. `gh` only for PR modes. Defaults use the Codex subscription and DeepSeek;
 edit `~/.helm/dispatch.json` to change models.
 
 ## Use
 
 ```sh
-helm add ~/code/api --test "npm test" --mode direct-pr --authority 2   # register a repo
-helm task api "fix the flaky login test"                               # delegate
-helm task api "why does sync double-write?" --kind scout               # or investigate
-helm daemon                                                            # run workers
-helm inbox                                                             # see what came back
-helm respond ID "use the existing OAuth provider"                      # answer a question
-helm promote ID --confirm                                              # merge, on your word
+helm add ~/code/api          # register a repo — test command and base branch auto-detected
+pi-firstmate                 # workers start in the background; Pi opens as your first mate
 ```
 
-Start your coding agent inside this repo and it becomes the liaison;
-[`AGENTS.md`](AGENTS.md) is its contract (`CLAUDE.md` links to it for Claude Code).
+Then talk: *"fix the flaky login test in api, and find out why the web bundle is 4 MB."*
+It queues the work, tells you when something needs a decision, and merges only when you say so.
+
+Under the hood it's a small CLI the liaison uses for you:
 
 ```sh
-cd ~/firstmate-graph && claude --dangerously-skip-permissions   # or: codex · pi
+helm status · helm inbox · helm respond ID "answer" · helm promote ID --confirm · helm down
 ```
+
+`pi-firstmate claude` or `pi-firstmate codex` opens the same liaison in another harness.
 
 ## Rules
 

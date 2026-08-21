@@ -1,7 +1,9 @@
 from __future__ import annotations
 import argparse
 import json
+import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -20,9 +22,82 @@ def out(obj, as_json: bool, text: str | None = None):
 
 def cmd_add(a):
     p = registry.add(a.path, a.id, a.mode, a.authority, a.test, a.protected.split(",") if a.protected else [], a.base)
-    out(p, a.json, f"registered {p['id']} ({p['mode']}, authority {p['authority']}, base {p['base']}) test=`{p['test_cmd'] or '(none!)'}`")
+    out(p, a.json, f"registered {p['id']}  mode {p['mode']} · authority {p['authority']} · base {p['base']}\n"
+                   f"  test: {p['test_cmd'] or '(none found)'}")
     if not p["test_cmd"]:
-        print("warning: no --test command; verify gates will pass trivially", file=sys.stderr)
+        print(f"  no test command detected — changes will not be verified. Set one: helm set {p['id']} --test \"…\"", file=sys.stderr)
+    elif a.test is None:
+        print(f"  (detected; override with: helm set {p['id']} --test \"…\")", file=sys.stderr)
+
+
+# ---------------------------------------------------------------- daemon lifecycle
+
+def _pid_file(): return home() / "daemon.pid"
+
+def daemon_pid():
+    try:
+        pid = int(_pid_file().read_text().strip())
+        os.kill(pid, 0)
+        return pid
+    except (OSError, ValueError):
+        return None
+
+
+def cmd_up(a):
+    if daemon_pid():
+        out({"pid": daemon_pid()}, a.json, f"workers already running (pid {daemon_pid()})")
+        return
+    home().mkdir(parents=True, exist_ok=True)
+    logf = open(home() / "daemon.log", "ab")
+    p = subprocess.Popen([sys.executable, str(Path(__file__).resolve().parents[1] / "bin" / "helm"), "daemon",
+                          "--owner", f"worker-{os.getpid()}", "--interval", str(a.interval)],
+                         stdin=subprocess.DEVNULL, stdout=logf, stderr=logf, start_new_session=True, env=os.environ)
+    _pid_file().write_text(str(p.pid))
+    out({"pid": p.pid}, a.json, f"workers running (pid {p.pid}) · log {home() / 'daemon.log'}")
+
+
+def cmd_down(a):
+    pid = daemon_pid()
+    if not pid:
+        out({"stopped": False}, a.json, "workers not running")
+        return
+    os.killpg(os.getpgid(pid), signal.SIGTERM)
+    _pid_file().unlink(missing_ok=True)
+    out({"stopped": True, "pid": pid}, a.json, f"stopped workers (pid {pid}); a running attempt will be reclaimed next start")
+
+
+def cmd_status(a):
+    items = work.all_items()
+    counts = {}
+    for i in items:
+        counts[i["status"]] = counts.get(i["status"], 0) + 1
+    pid = daemon_pid()
+    data = {"workers": pid, "projects": len(registry.load()["projects"]), "items": counts}
+    if a.json:
+        return out(data, True)
+    print(f"workers: {'running (pid %d)' % pid if pid else 'stopped  → helm up'}")
+    print(f"projects: {data['projects']}  → helm projects")
+    print("work: " + (", ".join(f"{k} {v}" for k, v in sorted(counts.items())) or "none") + "  → helm work / helm inbox")
+
+
+HARNESS = {
+    "pi": ["pi", "--approve"],
+    "claude": ["claude", "--dangerously-skip-permissions"],
+    "codex": ["codex", "--full-auto"],
+}
+
+
+def cmd_captain(a):
+    """One command: workers up, then the liaison in front of you."""
+    if not daemon_pid():
+        cmd_up(argparse.Namespace(json=False, interval=20))
+    cmd = HARNESS.get(a.harness) or [a.harness]
+    if not shutil.which(cmd[0]):
+        raise HelmError(f"{cmd[0]} is not on PATH")
+    repo = Path(__file__).resolve().parents[1]
+    print(f"liaison: {' '.join(cmd)}  (in {repo})", file=sys.stderr)
+    os.chdir(repo)
+    os.execvp(cmd[0], cmd)
 
 
 def cmd_set(a):
@@ -195,7 +270,7 @@ def main(argv=None):
 
     p = S("add", cmd_add, "register a repo"); p.add_argument("path"); p.add_argument("--id")
     p.add_argument("--mode", default="local-only", choices=registry.MODES); p.add_argument("--authority", type=int, default=1)
-    p.add_argument("--test", help="test command run inside the worktree (the verify gate)")
+    p.add_argument("--test", help="test command (the verify gate); auto-detected when omitted")
     p.add_argument("--protected", help="comma-separated globs the agent may not change"); p.add_argument("--base")
     p = S("set", cmd_set, "change a project's posture"); p.add_argument("id"); p.add_argument("--mode", choices=registry.MODES)
     p.add_argument("--authority", type=int); p.add_argument("--test"); p.add_argument("--protected"); p.add_argument("--base")
@@ -214,6 +289,11 @@ def main(argv=None):
     p = S("daemon", cmd_daemon, "execute forever"); p.add_argument("--owner", default="daemon"); p.add_argument("--interval", type=int, default=20)
     p.add_argument("--timeout", type=int, default=3600); p.add_argument("--once-idle", type=int, default=0, help="exit after N idle polls (tests)")
     S("dispatch", cmd_dispatch, "show dispatch table")
+    p = S("up", cmd_up, "start background workers"); p.add_argument("--interval", type=int, default=20)
+    S("down", cmd_down, "stop background workers")
+    S("status", cmd_status, "workers, projects, queue at a glance")
+    p = S("captain", cmd_captain, "start workers and open the liaison (pi by default)")
+    p.add_argument("harness", nargs="?", default="pi", help="pi | claude | codex | any command")
     p = S("doctor", cmd_doctor, "check tools, models, graphs"); p.add_argument("--probe", action="store_true", help="live 1-word call per model (costs a few tokens)")
     a = ap.parse_args(argv)
     try:

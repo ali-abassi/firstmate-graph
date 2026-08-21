@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Open the first mate in Pi: starts background workers, then launches pi as the liaison.
+# Usage: pi-firstmate              (pi)        pi-firstmate claude | codex   (other harnesses)
+exec "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0")")/helm" captain "${1:-pi}"

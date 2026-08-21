@@ -1,4 +1,4 @@
-import json, os, subprocess, sys, tempfile, unittest
+import json, os, subprocess, sys, tempfile, time, unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -139,6 +139,24 @@ class HelmTests(unittest.TestCase):
         it = self.show(it["id"])
         self.assertEqual(it["status"], "ready")
         self.assertTrue(any("stale lease" in h["note"] for h in it["history"]))
+
+    def test_add_autodetects_test_command(self):
+        (self.proj / "package.json").write_text('{"scripts": {"test": "vitest"}}')
+        r = self.helm("add", str(self.proj), "--id", "p", "--json")
+        self.assertEqual(json.loads(r.stdout)["test_cmd"], "npm test")
+        self.assertIn("detected", r.stderr)
+
+    def test_up_status_down(self):
+        self.add(mode="local-only")
+        it = self.task()
+        self.helm("up", "--interval", "1")
+        self.assertIn("running", self.helm("status").stdout)
+        deadline = time.time() + 30
+        while time.time() < deadline and self.show(it["id"])["status"] != "ready":
+            time.sleep(0.5)
+        self.assertEqual(self.show(it["id"])["status"], "ready")
+        self.assertIn("stopped", self.helm("down").stdout)
+        self.assertIn("stopped", self.helm("status").stdout)
 
 
 if __name__ == "__main__":

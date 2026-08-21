@@ -87,3 +87,27 @@ class ProtectedPathTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DetectTests(unittest.TestCase):
+    def repo(self, files):
+        d = Path(tempfile.mkdtemp())
+        for name, body in files.items():
+            (d / name).parent.mkdir(parents=True, exist_ok=True); (d / name).write_text(body)
+        return d
+
+    def test_detects_common_stacks(self):
+        from helm import detect
+        cases = [
+            ({"package.json": '{"scripts": {"test": "vitest"}}'}, "npm test"),
+            ({"package.json": '{"scripts": {"test": "vitest"}}', "pnpm-lock.yaml": ""}, "pnpm test"),
+            ({"package.json": '{"scripts": {"test": "echo \\"Error: no test specified\\""}}'}, None),
+            ({"Cargo.toml": ""}, "cargo test"),
+            ({"go.mod": ""}, "go test ./..."),
+            ({"pyproject.toml": ""}, "python3 -m pytest -q"),
+            ({"pyproject.toml": "", "uv.lock": ""}, "uv run pytest -q"),
+            ({"Makefile": "build:\n\techo\ntest:\n\tpytest\n"}, "make test"),
+            ({"README.md": ""}, None),
+        ]
+        for files, want in cases:
+            self.assertEqual(detect.test_command(self.repo(files)), want, files)

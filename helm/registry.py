@@ -41,9 +41,11 @@ def add(path: str, project_id: str | None, mode: str, authority: int, test_cmd: 
     if authority not in AUTHORITY:
         raise HelmError(f"authority must be 0-3")
     pid = project_id or re.sub(r"[^a-z0-9-]+", "-", repo.name.lower()).strip("-")
+    from . import detect
     if not base:
-        head = git(repo, "symbolic-ref", "--short", "HEAD", check=False) or "main"
-        base = head
+        base = detect.base_branch(repo)
+    if test_cmd is None:
+        test_cmd = detect.test_command(repo)
     entry = {
         "id": pid, "path": str(repo), "mode": mode, "authority": authority,
         "base": base, "test_cmd": test_cmd or "",
