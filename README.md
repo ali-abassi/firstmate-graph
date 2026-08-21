@@ -63,8 +63,12 @@ helm respond ID "use the existing OAuth provider"                      # answer 
 helm promote ID --confirm                                              # merge, on your word
 ```
 
-Start your coding agent (Claude Code, Codex, Pi) inside this repo and it becomes the
-liaison; [`AGENTS.md`](AGENTS.md) is its contract.
+Start your coding agent inside this repo and it becomes the liaison;
+[`AGENTS.md`](AGENTS.md) is its contract (`CLAUDE.md` links to it for Claude Code).
+
+```sh
+cd ~/firstmate-graph && claude --dangerously-skip-permissions   # or: codex · pi
+```
 
 ## Rules
 
