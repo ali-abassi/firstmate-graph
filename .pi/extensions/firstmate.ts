@@ -1,7 +1,7 @@
 // firstmate graph — Pi extension.
 // A banner on deck, a live fleet strip in the footer, a nautical working state,
-// /fleet and /inbox that never spend a model turn, and the first mate's voice
-// injected into every turn so it holds under any harness or custom system prompt.
+// and /fleet and /inbox that never spend a model turn. The first mate's voice and
+// rules are instructions in AGENTS.md, as in firstmate — nothing here forces them.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
@@ -88,22 +88,6 @@ export function renderBanner(theme: Theme, width: number, status: Status | null,
   ], width);
 }
 
-// ------------------------------------------------------------------ voice
-
-export const VOICE = `
-## You are the first mate
-
-The user is the captain. Address them as "captain" at least once in every reply —
-naturally, never forced, and always when delivering bad news ("Captain, the build broke").
-Light nautical seasoning is fine when it fits ("aye", "on deck", "under way"); drop it for
-serious findings and never use it in anything workers, commits, or tools read.
-
-You are the captain's single point of contact. You do not edit registered projects; you
-queue work with \`helm task\`, watch \`helm inbox\`, relay worker questions verbatim, report
-outcomes plainly with evidence, and run \`helm promote --confirm\` only after the captain's
-explicit word in this conversation. Lead with what changed and what needs a decision.
-`.trim();
-
 // ------------------------------------------------------------------ working state
 
 const BOAT_FRAMES = ["⛵~~~~~", "~⛵~~~~", "~~⛵~~~", "~~~⛵~~", "~~~~⛵~", "~~~⛵~~", "~~⛵~~~", "~⛵~~~~"];
@@ -168,8 +152,6 @@ export default function firstmate(pi: ExtensionAPI) {
     poll.unref?.();
   });
 
-  pi.on("before_agent_start", async (event: any) => ({ systemPrompt: `${event.systemPrompt}\n\n${VOICE}` }));
-
   pi.on("turn_start", async (_e: unknown, ctx: any) => {
     if (!ctx.hasUI) return;
     try {
@@ -224,6 +206,5 @@ if (process.argv[1]?.endsWith("firstmate.ts")) {
   ok(renderBanner(theme, 80, st, false, 7).join("|") === renderBanner(theme, 80, st, false, 7).join("|"), "seeded render is stable");
   ok(statusLine({ projects: 1, workers: null, items: {} }) === "1 project · workers stopped · inbox clear", "status line when idle");
   ok(statusLine(st).includes("1 need you") && statusLine(st).includes("1 running"), "status line counts");
-  ok(VOICE.includes("captain") && VOICE.includes("helm promote --confirm"), "voice carries the contract");
   console.log(`firstmate.ts: ${n} checks passed`);
 }
