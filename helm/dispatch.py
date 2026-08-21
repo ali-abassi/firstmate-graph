@@ -12,12 +12,13 @@ PHASES = ("plan", "implement", "review_correctness", "review_adversarial", "scou
 
 DEFAULT = {
     "version": 1,
-    "models": {  # global defaults; rules override per phase. provider/id as in `pi --list-models`
-        "plan": "anthropic/claude-sonnet-5",
+    "models": {  # global defaults; rules override per phase. provider/id as in `pi --list-models`.
+        # Codex subscription + DeepSeek (Baseten key) only: Anthropic via pi is not working.
+        "plan": "openai-codex/gpt-5.5",
         "implement": "openai-codex/gpt-5.5",
         "review_correctness": "baseten/deepseek-ai/DeepSeek-V4-Pro",
-        "review_adversarial": "anthropic/claude-sonnet-5",
-        "scout": "anthropic/claude-sonnet-5",
+        "review_adversarial": "openai-codex/gpt-5.5",
+        "scout": "openai-codex/gpt-5.5",
     },
     "thinking": {"plan": "high", "implement": "medium", "review_correctness": "medium",
                  "review_adversarial": "high", "scout": "medium"},
@@ -26,7 +27,8 @@ DEFAULT = {
         {"name": "hotfix-cheap", "kind": "ship", "labels": ["cheap"],
          "models": {"implement": "openai-codex/gpt-5.4-mini"}},
         {"name": "hard", "kind": "ship", "labels": ["hard"],
-         "models": {"implement": "anthropic/claude-opus-5"}, "thinking": {"implement": "high"}},
+         "models": {"implement": "openai-codex/gpt-5.5", "review_correctness": "baseten/deepseek-ai/DeepSeek-V4-Pro"},
+         "thinking": {"implement": "high", "review_adversarial": "high"}},
         {"name": "default-ship", "kind": "ship"},
     ],
 }

@@ -112,11 +112,11 @@ class HelmTests(unittest.TestCase):
         self.add(mode="no-mistakes", authority=1)
         it = self.task("big refactor", labels="hard")
         self.assertEqual(it["dispatch"]["rule"], "hard")
-        self.assertEqual(it["dispatch"]["models"]["implement"], "anthropic/claude-opus-5")
+        self.assertEqual(it["dispatch"]["thinking"]["implement"], "high")
         self.helm("run-once")
         steps = (self.home / "work" / it["id"] / "steps.yaml").read_text()
         self.assertNotIn("@{", steps)
-        self.assertIn("model: anthropic/claude-opus-5", steps)
+        self.assertIn("thinking: high", steps)
         self.assertIn("review_adversarial", steps)
         # no-mistakes at authority 1 → ready, not PR
         self.assertEqual(self.show(it["id"])["status"], "ready")
