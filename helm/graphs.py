@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import signal
 import subprocess
 from pathlib import Path
 from string import Template
@@ -53,7 +54,21 @@ def run(steps: Path, brief: Path, timeout: int) -> dict:
     cmd = [piw_bin(), "run", str(steps), "--input-file", str(brief), "--json",
            "--no-cache", "--timeout", str(timeout)]
     log(f"exec {' '.join(shlex.quote(c) for c in cmd)}")
-    r = subprocess.run(cmd, text=True, capture_output=True, cwd=str(steps.parent))
+    # stdin MUST be closed: `pi -p` blocks forever on an open inherited pipe (fine in a
+    # terminal, fatal under a daemon). Own process group so a timeout kills pi too.
+    proc = subprocess.Popen(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL, cwd=str(steps.parent), start_new_session=True)
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout + 120)
+    except subprocess.TimeoutExpired:
+        os.killpg(proc.pid, signal.SIGTERM)
+        try:
+            stdout, stderr = proc.communicate(timeout=15)
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            stdout, stderr = proc.communicate()
+        stderr = (stderr or "") + f"\nhelm: killed piw after {timeout + 120}s"
+    r = subprocess.CompletedProcess(cmd, proc.returncode, stdout or "", stderr or "")
     summary = None
     for line in reversed(r.stdout.splitlines()):
         line = line.strip()
@@ -89,3 +104,36 @@ def failure_notes(summary: dict, limit: int = 3000) -> str:
                         pass
         parts.append(f"failed node `{sid}`:\n" + ("\n".join(chunk) or "(no evidence files)"))
     return "\n\n".join(parts)
+
+
+def probe_model(model: str, timeout: int = 60) -> tuple[bool, str]:
+    """One-word live call through pi with piw's exact flags. Proves auth + model id."""
+    cmd = ["pi", "-p", "--mode", "json", "--no-session", "--no-approve", "--offline",
+           "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-tools",
+           "--model", model, "reply with the single word pong"]
+    try:
+        r = subprocess.run(cmd, text=True, capture_output=True, stdin=subprocess.DEVNULL, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return False, f"no answer in {timeout}s"
+    except FileNotFoundError:
+        return False, "pi not on PATH"
+    err, got_text, actual = "", False, None
+    for line in r.stdout.splitlines():
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        m = ev.get("message") or {}
+        if ev.get("type") == "message_end" and m.get("role") == "assistant":
+            if m.get("errorMessage"):
+                err = m["errorMessage"].split(";")[0][:160]
+            actual = f"{m.get('provider')}/{m.get('model')}"
+            if any(c.get("type") == "text" and c.get("text") for c in m.get("content", [])):
+                got_text = True
+    if err:
+        return False, err
+    if not got_text:
+        return False, f"no assistant text (exit {r.returncode}) {r.stderr[-200:]}"
+    if actual != model:
+        return False, f"model drift: got {actual}"
+    return True, "pong"

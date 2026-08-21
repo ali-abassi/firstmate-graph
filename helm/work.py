@@ -88,10 +88,24 @@ def brief_text(it: dict, project: dict) -> str:
     return "\n".join(lines)
 
 
+def _pid_alive(pid) -> bool:
+    if not pid:
+        return False
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def claim_next(owner: str) -> dict | None:
     """Oldest queued item whose project has no running item. Lock-protected."""
     with locked(home() / "claim.lock"):
         items = all_items()
+        for it in items:                      # a dead owner's lease is not a running item
+            if it["status"] == "running" and not _pid_alive((it.get("lease") or {}).get("pid")):
+                it.pop("lease", None)
+                transition(it, "queued", "stale lease (owner died); requeued without burning an attempt")
         busy = {i["project"] for i in items if i["status"] in ACTIVE}
         for it in items:
             if it["status"] == "queued" and it["project"] not in busy:

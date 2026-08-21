@@ -129,6 +129,17 @@ class HelmTests(unittest.TestCase):
         hist = self.show(b["id"])["history"]
         self.assertEqual(hist[0]["to"], "running")
 
+    def test_stale_lease_is_reclaimed(self):
+        self.add(mode="local-only")
+        it = self.task()
+        p = self.home / "work" / it["id"] / "item.json"
+        d = json.loads(p.read_text()); d["status"] = "running"; d["lease"] = {"owner": "ghost", "pid": 999999}
+        p.write_text(json.dumps(d))
+        self.helm("run-once")                      # reclaims, then executes
+        it = self.show(it["id"])
+        self.assertEqual(it["status"], "ready")
+        self.assertTrue(any("stale lease" in h["note"] for h in it["history"]))
+
 
 if __name__ == "__main__":
     unittest.main()

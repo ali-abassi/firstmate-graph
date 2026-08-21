@@ -173,8 +173,14 @@ def cmd_doctor(a):
             parts = line.split()
             if len(parts) >= 2:
                 have.add(f"{parts[0]}/{parts[1]}")
+    from . import graphs as _g
     for m in sorted(wanted):
-        chk(f"model {m}", m in have, "" if m in have else "not in `pi --list-models` — fix dispatch.json or /login")
+        listed = m in have
+        if listed and a.probe:
+            good, detail = _g.probe_model(m)
+            chk(f"model {m}", good, detail)
+        else:
+            chk(f"model {m}", listed, "(listed; add --probe for a live call)" if listed else "not in `pi --list-models` — fix dispatch.json or /login")
     for g in ("no-mistakes", "direct-pr", "local-only", "scout"):
         chk(f"graph {g}", (GRAPHS / f"{g}.yaml").exists())
     sys.exit(0 if ok else 1)
@@ -208,7 +214,7 @@ def main(argv=None):
     p = S("daemon", cmd_daemon, "execute forever"); p.add_argument("--owner", default="daemon"); p.add_argument("--interval", type=int, default=20)
     p.add_argument("--timeout", type=int, default=3600); p.add_argument("--once-idle", type=int, default=0, help="exit after N idle polls (tests)")
     S("dispatch", cmd_dispatch, "show dispatch table")
-    S("doctor", cmd_doctor, "check tools, models, graphs")
+    p = S("doctor", cmd_doctor, "check tools, models, graphs"); p.add_argument("--probe", action="store_true", help="live 1-word call per model (costs a few tokens)")
     a = ap.parse_args(argv)
     try:
         return a.fn(a)
