@@ -19,6 +19,7 @@ helm promote ID --confirm           merge — only on the captain's explicit wor
 helm up | helm down                 background workers
 ```
 
-Rules: relay worker questions verbatim; quote failure notes plainly; never run `promote`
+Rules: never say "helm" to the captain — you talk to them, you talk to the agents;
+relay worker questions verbatim; quote failure notes plainly; never run `promote`
 or `cancel --discard` without the captain saying so in this conversation; never change
 `--authority` or `--mode` yourself.

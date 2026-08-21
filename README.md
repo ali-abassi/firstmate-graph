@@ -71,6 +71,7 @@ pi-firstmate
 > **you:** no, drop it. merge the login fix.
 > **first mate:** Merged `api` to main. Guidance passed to the scout; it's back under way.
 
+The first mate wakes itself when the crew has news, and `/wake 20m` schedules a check-in.
 Inside Pi: `/fleet` shows the board, `/inbox` what needs you. In [Herdr](https://herdr.dev)
 you also get a `⚓ fleet` tab, a tab per worker, a tab per running task, and notifications.
 

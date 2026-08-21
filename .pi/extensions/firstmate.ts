@@ -1,6 +1,7 @@
 // firstmate graph — Pi extension.
 // A banner on deck, a live fleet strip in the footer, a nautical working state,
-// and /fleet and /inbox that never spend a model turn. The first mate's voice and
+// /fleet and /inbox that never spend a model turn, and a wake: the mate turns by itself
+// when the crew has news or when the captain schedules a check-in (/wake 20m). The first mate's voice and
 // rules are instructions in AGENTS.md, as in firstmate — nothing here forces them.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
@@ -88,6 +89,22 @@ export function renderBanner(theme: Theme, width: number, status: Status | null,
   ], width);
 }
 
+// ------------------------------------------------------------------ wake
+
+/** "20m", "1h", "1h30m", "45" (minutes) → ms; null when unparseable. */
+export function parseWake(text: string): number | null {
+  const m = text.trim().match(/^(?:(\d+)h)?(?:(\d+)m?)?$/i);
+  if (!m || (!m[1] && !m[2])) return null;
+  const ms = (Number(m[1] || 0) * 60 + Number(m[2] || 0)) * 60_000;
+  return ms > 0 ? ms : null;
+}
+
+export function wakeText(kind: "inbox" | "timer", detail: string): string {
+  return kind === "inbox"
+    ? `⚓ WAKE — the crew has news:\n${detail}\n\nReport this to the captain in plain language (never mention helm): what landed, what failed, what needs a decision. Relay any question verbatim and wait for their answer.`
+    : `⚓ WAKE — check-in you scheduled${detail ? ` ("${detail}")` : ""}. Look at the fleet (inbox, running work) and give the captain a short status. If nothing moved, say so in one line.`;
+}
+
 // ------------------------------------------------------------------ working state
 
 const BOAT_FRAMES = ["⛵~~~~~", "~⛵~~~~", "~~⛵~~~", "~~~⛵~~", "~~~~⛵~", "~~~⛵~~", "~~⛵~~~", "~⛵~~~~"];
@@ -104,6 +121,9 @@ export default function firstmate(pi: ExtensionAPI) {
   let poll: ReturnType<typeof setInterval> | undefined;
   let ticker: ReturnType<typeof setInterval> | undefined;
   let lastNeeds = -1;
+  let lastSignature = "";
+  const wakeTimers = new Map<number, { at: number; note: string; t: ReturnType<typeof setTimeout> }>();
+  let wakeSeq = 0;
 
   async function status(): Promise<Status | null> {
     try {
@@ -120,10 +140,14 @@ export default function firstmate(pi: ExtensionAPI) {
     const running = s.items["running"] || 0;
     try {
       ui.setStatus("firstmate", `${ANCHOR} ${running ? `${running} under way` : "crew idle"}${needs ? ` · ${needs} need you` : ""}`);
-      if (notifyNew && lastNeeds >= 0 && needs > lastNeeds) {
-        const r = await helm("inbox");
-        if (r.code === 0) ui.notify(`Captain — something needs you:\n${r.stdout.trim()}`, "warning");
+      // Wake the first mate when the inbox changes shape: it reports, the captain never polls.
+      const signature = ["needs-you", "failed", "ready", "pr-open", "done", "merged"].map((k) => `${k}:${s.items[k] || 0}`).join(",");
+      if (notifyNew && lastSignature && signature !== lastSignature && needs > lastNeeds) {
+        const r = await helm("inbox", "--hints");
+        if (r.code === 0) pi.sendMessage({ customType: "firstmate-wake", content: wakeText("inbox", r.stdout.trim()), display: false },
+                                         { deliverAs: "followUp", triggerTurn: true });
       }
+      lastSignature = signature;
     } catch {}
     lastNeeds = needs;
   }
@@ -166,6 +190,30 @@ export default function firstmate(pi: ExtensionAPI) {
   pi.on("turn_end", async () => { if (ticker) clearInterval(ticker); ticker = undefined; });
   pi.on("agent_end", async () => { if (ticker) clearInterval(ticker); ticker = undefined; await refreshStrip(true); });
 
+  pi.registerCommand("wake", {
+    description: "Wake the first mate later to check in: /wake 20m [note] · /wake = list · /wake clear",
+    handler: async (args: string, ctx: any) => {
+      const text = args.trim();
+      if (!text) {
+        const rows = [...wakeTimers.values()].map((w) => `⏰ in ${Math.max(1, Math.round((w.at - Date.now()) / 60000))}m${w.note ? ` — ${w.note}` : ""}`);
+        ctx.ui.notify(rows.length ? rows.join("\n") : "No check-ins scheduled. /wake 20m see if the login fix landed", "info");
+        return;
+      }
+      if (text === "clear") { for (const w of wakeTimers.values()) clearTimeout(w.t); wakeTimers.clear(); ctx.ui.notify("Check-ins cleared.", "info"); return; }
+      const [when, ...rest] = text.split(/\s+/);
+      const ms = parseWake(when);
+      if (!ms) { ctx.ui.notify("Usage: /wake <20m|1h|1h30m> [what to check]", "warning"); return; }
+      const id = ++wakeSeq, note = rest.join(" ");
+      const t = setTimeout(() => {
+        wakeTimers.delete(id);
+        try { pi.sendMessage({ customType: "firstmate-wake", content: wakeText("timer", note), display: false }, { deliverAs: "followUp", triggerTurn: true }); } catch {}
+      }, ms);
+      t.unref?.();
+      wakeTimers.set(id, { at: Date.now() + ms, note, t });
+      ctx.ui.notify(`⏰ Aye — I'll check in in ${Math.round(ms / 60000)}m${note ? ` on "${note}"` : ""}.`, "info");
+    },
+  });
+
   pi.registerCommand("fleet", {
     description: "Fleet board: workers, projects, queue",
     handler: async (_args: string, ctx: any) => {
@@ -185,6 +233,7 @@ export default function firstmate(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async () => {
     if (poll) clearInterval(poll); if (ticker) clearInterval(ticker);
+    for (const w of wakeTimers.values()) clearTimeout(w.t); wakeTimers.clear();
     try { ui?.setStatus?.("firstmate", undefined); ui?.setWorkingMessage?.(); ui?.setWorkingIndicator?.(); } catch {}
     ui = undefined;
   });
@@ -206,5 +255,8 @@ if (process.argv[1]?.endsWith("firstmate.ts")) {
   ok(renderBanner(theme, 80, st, false, 7).join("|") === renderBanner(theme, 80, st, false, 7).join("|"), "seeded render is stable");
   ok(statusLine({ projects: 1, workers: null, items: {} }) === "1 project · workers stopped · inbox clear", "status line when idle");
   ok(statusLine(st).includes("1 need you") && statusLine(st).includes("1 running"), "status line counts");
+  ok(parseWake("20m") === 1_200_000 && parseWake("1h") === 3_600_000 && parseWake("1h30m") === 5_400_000 && parseWake("45") === 2_700_000, "wake durations parse");
+  ok(parseWake("soon") === null && parseWake("0m") === null, "bad wake durations rejected");
+  ok(wakeText("inbox", "x").includes("never mention helm") && wakeText("timer", "").includes("check-in"), "wake prompts carry the rules");
   console.log(`firstmate.ts: ${n} checks passed`);
 }
