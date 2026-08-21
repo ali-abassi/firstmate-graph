@@ -111,3 +111,16 @@ class DetectTests(unittest.TestCase):
         ]
         for files, want in cases:
             self.assertEqual(detect.test_command(self.repo(files)), want, files)
+
+
+class PiExtensionTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("bun"), "bun not installed")
+    def test_extension_self_test_passes(self):
+        r = subprocess.run(["bun", str(REPO / ".pi" / "extensions" / "firstmate.ts")], text=True, capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("checks passed", r.stdout)
+
+    def test_voice_contract_is_in_agents_md_too(self):
+        agents = (REPO / "AGENTS.md").read_text()
+        self.assertIn('"captain"', agents)
+        self.assertIn("promote", agents)

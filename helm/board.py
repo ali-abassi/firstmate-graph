@@ -43,7 +43,7 @@ def banner(workers_pid: int | None) -> str:
 def watch(interval: float, once: bool = False) -> None:
     from .cli import daemon_pid
     while True:
-        out = BANNER + render(daemon_pid()) + f"\n\n  {time.strftime('%H:%M:%S')} · refreshing every {interval:g}s · ctrl-c to stop\n"
+        out = BANNER + render(daemon_pid()) + ("" if once else f"\n\n  {time.strftime('%H:%M:%S')} · refreshing every {interval:g}s · ctrl-c to stop\n")
         if not once:
             print("\033[2J\033[H", end="")
         print(out)

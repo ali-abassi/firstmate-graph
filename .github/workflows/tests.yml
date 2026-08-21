@@ -15,5 +15,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: oven-sh/setup-bun@v2
+      - run: bun add -d @earendil-works/pi-coding-agent @earendil-works/pi-tui >/dev/null 2>&1 || true
       - run: git config --global user.email ci@example.com && git config --global user.name ci
       - run: python -m unittest discover -s tests -v

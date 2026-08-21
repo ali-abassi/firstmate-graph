@@ -122,8 +122,11 @@ def cmd_captain(a):
     have_tabs = any(t["kind"] == "worker" for t in read_json(home() / "herdr.json", {"tabs": []})["tabs"])
     if not daemon_pid() and not (herdr.inside() and have_tabs):
         cmd_up(argparse.Namespace(json=False, interval=20, workers=a.workers))
-    print(board.banner(daemon_pid()))
-    print(f"  first mate: {' '.join(cmd)}\n", file=sys.stderr)
+    if a.harness == "pi":
+        print(f"  ⚓ workers {'in herdr tabs' if herdr.inside() else 'up'} · first mate coming on deck…", file=sys.stderr)
+    else:
+        print(board.banner(daemon_pid()))
+        print(f"  first mate: {' '.join(cmd)}\n", file=sys.stderr)
     repo = Path(__file__).resolve().parents[1]
     os.chdir(repo)
     os.execvp(cmd[0], cmd)
