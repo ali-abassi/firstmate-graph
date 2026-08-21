@@ -132,10 +132,10 @@ def cmd_daemon(a):
             idle = 0
             try:
                 work.execute(it, timeout=a.timeout)
-            except Exception as e:  # never let one item kill the loop
-                it = work.load(it["id"])
-                it.pop("lease", None)
-                work.transition(it, "failed", f"executor crashed: {e!r}")
+            except KeyboardInterrupt:
+                raise
+            except BaseException as e:  # execute() already marked the item failed; keep the loop alive
+                log(f"{it['id']}: executor error {e!r}")
             continue
         idle += 1
         if a.once_idle and idle >= a.once_idle:

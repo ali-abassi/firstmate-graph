@@ -3,71 +3,40 @@
 [![tests](https://github.com/ali-abassi/firstmate-graph/actions/workflows/tests.yml/badge.svg)](https://github.com/ali-abassi/firstmate-graph/actions/workflows/tests.yml)
 [![license](https://img.shields.io/badge/license-MIT-11110f)](LICENSE)
 
-**Talk to one agent. It delegates to many. Everything comes back through one channel.**
-
-You have many repos. You have a Codex subscription, some API keys, and coding agents that
-are each good at one task at a time. What you don't have is a single place to say "do
-these six things across these three projects" and then see, in one place, what got done,
-what failed, and what needs your decision.
-
-firstmate graph is that place.
+**One agent to talk to. Many agents doing the work. One place to see results.**
 
 ```
-you ──chat──► one liaison agent            (reads your repos; never writes to them)
-                 │ queues work
-                 ▼
-              helm                          (plain Python; no model in the control path)
-              queue · leases · one git worktree per attempt · delivery · promotion
-                 │ one item at a time per repo, many repos at once
-                 ▼
-              piw (pi-graph)               (runs the steps of one attempt, in order, with proof)
-              implement → verify → review   — each step pinned to a model you choose
-                 │
-                 ▼
-              helm inbox                    (the one channel back: asks · failures · ready branches · PRs)
+you ──► liaison agent ──► helm queue ──► workers (one per repo at a time, many repos at once)
+                                            │
+you ◄── helm inbox ◄────────────────────────┘   questions · finished branches · failures
 ```
 
-## Why this shape
+You describe work. The liaison queues it. Workers run each task in its own git worktree,
+through a fixed sequence of steps (implement → verify → review) that a model cannot skip.
+Everything comes back through one inbox. Nothing merges until you say so.
 
-- **One thread of communication.** You talk to the liaison. The liaison talks to `helm`.
-  Workers never talk to you; they write evidence, and `helm inbox` is the only thing
-  anyone needs to read.
-- **Code decides, models work.** Which steps run, in which order, what counts as passing,
-  how many retries, who may merge — all of that is code and data you can read. Models
-  only work *inside* a step and cannot skip one.
-- **Nothing leaves your machine without your word.** Every attempt runs in its own git
-  worktree. Your checkouts are untouched until you run `helm promote --confirm`.
-- **Ask, don't guess.** A worker that hits a real decision writes a question and stops.
-  You answer once; the work continues with your answer in hand.
+## Why
 
-It keeps the operating contract of [firstmate](https://github.com/kunchenguid/firstmate)
-(project modes, authority levels, the liaison's hard rules) and replaces its prose-driven
-orchestration with [pi-graph](https://github.com/ali-abassi/pi-graph) workflows.
-Our fork of the original lives at [ali-abassi/firstmate](https://github.com/ali-abassi/firstmate).
+Coding agents are good at one task. Running ten of them across five repos turns you into
+a tab-juggler. firstmate graph gives you a single thread: you talk to one agent, code
+decides what runs and when, models only work inside the steps, and the evidence of every
+run is kept on disk.
 
-## The proof, as a test
+It borrows its operating contract from [firstmate](https://github.com/kunchenguid/firstmate)
+([our fork](https://github.com/ali-abassi/firstmate)) and runs the steps with
+[pi-graph](https://github.com/ali-abassi/pi-graph).
 
-[`tests/test_one_thread.py`](tests/test_one_thread.py) is the whole idea in one scenario,
-and it runs on every push (see the badge):
+## Proof
 
-1. The liaison queues **six tasks across three repos** — builds and investigations.
-2. **Two worker processes** drain the queue concurrently. The test asserts they worked
-   *different* repos at the same time and *never* the same repo at the same time.
-3. One worker needs a human decision. It **asks instead of guessing**, and it costs no
-   retry.
-4. **Everything** the captain needs — the question, three finished branches, two
-   investigation reports — shows up in **one inbox**, nowhere else.
-5. No repo's `main` moved. No checkout is dirty.
-6. The liaison relays the answer; the same worker pool finishes the job.
-7. Promotion without `--confirm` is refused; with it, `main` fast-forwards.
-8. Every delegation is auditable: who ran it, which graph, which model, what it cost.
+**[`tests/test_one_thread.py`](tests/test_one_thread.py)** runs the whole idea on every push:
+six tasks, three repos, two workers in parallel, one worker that stops to ask a question,
+one inbox with everything in it, no repo touched until `promote --confirm`.
 
-The suite drives the real CLI end-to-end against a stand-in `piw` so it spends no tokens.
-The same path was verified live with the real `piw` and `openai-codex/gpt-5.4-mini`:
-27 s, $0.009, green tests, fast-forwarded.
+**[`docs/evidence/live-run.md`](docs/evidence/live-run.md)** is a dated record of the same
+path against the real `piw` and a real model (`tests/test_live.py`, opt-in with `HELM_LIVE=1`).
 
 ```sh
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -v     # 16 tests, no tokens spent
 ```
 
 ## Install
@@ -75,61 +44,37 @@ python3 -m unittest discover -s tests -v
 ```sh
 git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph
 ln -sf ~/firstmate-graph/bin/helm ~/.local/bin/helm
-helm doctor --probe      # checks git, piw, pi, gh, and makes a live 1-word call per model
+helm doctor --probe
 ```
 
-You need [pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`) and `pi` logged in to
-at least one provider (`pi` → `/login`). `gh` is needed only for PR modes. Python 3.10+.
-Defaults use the Codex subscription (`openai-codex/*`) and DeepSeek via Baseten; change
-them in `~/.helm/dispatch.json`.
+Needs [pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`), `pi` logged in to a
+provider, and `gh` for PR modes. Defaults use the Codex subscription and DeepSeek;
+edit `~/.helm/dispatch.json` to change models.
 
 ## Use
 
 ```sh
-# register repos: the test command is the gate every change must pass
-helm add ~/code/api  --test "npm test"  --mode direct-pr  --authority 2
-helm add ~/code/lib  --test "pytest -q" --mode local-only --authority 3
-
-# delegate
-helm task api "fix the flaky login test"
-helm task api "why does sync double-write?" --kind scout
-helm task lib "add retry with backoff to the client" --labels hard
-
-# run workers (as many terminals as you like)
-helm daemon
-
-# the one channel back
-helm inbox
-helm respond ID "use the existing OAuth provider"
-helm promote ID --confirm
+helm add ~/code/api --test "npm test" --mode direct-pr --authority 2   # register a repo
+helm task api "fix the flaky login test"                               # delegate
+helm task api "why does sync double-write?" --kind scout               # or investigate
+helm daemon                                                            # run workers
+helm inbox                                                             # see what came back
+helm respond ID "use the existing OAuth provider"                      # answer a question
+helm promote ID --confirm                                              # merge, on your word
 ```
 
-To get the liaison, start your coding agent (Claude Code, Codex, Pi, …) inside this repo.
-[`AGENTS.md`](AGENTS.md) is its contract: read the repos, queue work with `helm`, relay
-questions verbatim, never merge without your word.
+Start your coding agent (Claude Code, Codex, Pi) inside this repo and it becomes the
+liaison; [`AGENTS.md`](AGENTS.md) is its contract.
 
-## The rules, in one table
+## Rules
 
 | | |
 |---|---|
-| **Mode** (per repo) | `local-only`: branch left for you to fast-forward · `direct-pr`: implement, verify, one review, open PR · `no-mistakes`: plan, implement, protected-path gate, verify, correctness **and** adversarial review, open PR |
-| **Authority** (per repo, raised only by you) | `0` investigate only · `1` build in a worktree · `2` may open a PR · `3` may merge on `promote --confirm` |
-| **Dispatch** | `~/.helm/dispatch.json`: the first rule matching kind / labels / repo fixes the graph and the `provider/model` per step. A drifted model fails the step; it is never silently swapped |
-| **Attempts** | a failed gate discards the worktree, appends the evidence to the next brief, and requeues — up to 3 times |
-| **Asking** | a worker writes `.helm-ask.json` and stops; the item waits in the inbox and keeps its retry budget |
-| **Evidence** | `~/.helm/work/<id>/`: state and history, the brief, the exact rendered graph, and pi-graph's per-step outputs, trace, tokens and cost. `piw ui ~/.helm/work/<id>/steps.yaml` opens it in Studio |
-| **Concurrency** | one running item per repo; any number of `helm daemon`s share the queue; a dead worker's lease is reclaimed |
-
-## Layout
-
-```
-bin/helm          the CLI
-helm/             registry · dispatch · work (state machine) · worktree · graphs · deliver
-graphs/           local-only.yaml · direct-pr.yaml · no-mistakes.yaml · scout.yaml  (pi-graph workflows)
-tests/            test_one_thread.py · test_helm.py · fake_piw.py
-AGENTS.md         the liaison's contract
-```
-
-## License
+| **Mode** per repo | `local-only` leaves a branch · `direct-pr` opens a PR · `no-mistakes` adds a plan, a protected-path gate and two reviews first |
+| **Authority** per repo | `0` investigate · `1` build · `2` open PRs · `3` merge on `--confirm` — only you raise it |
+| **Dispatch** | a data file picks the graph and the model for each step; a wrong model fails the step |
+| **Retries** | a failed gate discards the worktree, keeps the evidence, retries up to 3 times |
+| **Questions** | a worker that needs a decision stops and asks; it does not guess |
+| **Evidence** | `~/.helm/work/<id>/` — brief, exact graph, every step's output, tokens, cost |
 
 MIT.

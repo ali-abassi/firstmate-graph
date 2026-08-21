@@ -116,6 +116,18 @@ def claim_next(owner: str) -> dict | None:
 
 
 def execute(it: dict, timeout: int = 3600) -> dict:
+    """Run one attempt. Any crash on the way marks the item failed instead of leaving it leased."""
+    try:
+        return _execute(it, timeout)
+    except BaseException as e:          # includes HelmError (a SystemExit) and KeyboardInterrupt
+        it = load(it["id"])
+        if it["status"] == "running":
+            it.pop("lease", None)
+            transition(it, "failed", f"attempt crashed: {getattr(e, 'msg', None) or e!r}")
+        raise
+
+
+def _execute(it: dict, timeout: int) -> dict:
     project = registry.get(it["project"])
     d = item_dir(it["id"])
     wt = worktree.create(project, it["id"])
