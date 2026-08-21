@@ -1,0 +1,36 @@
+version: 1
+workflow: helm-local-only
+cwd: @{CWD}
+workers: 1
+input:
+  required: true
+  description: helm brief (task, constraints, failure notes from earlier attempts)
+steps:
+  - id: implement
+    needs: []
+    agent: true
+    model: @{MODEL_IMPLEMENT}
+    thinking: @{THINKING_IMPLEMENT}
+    prompt: |
+      You are working inside a disposable git worktree on branch @{BRANCH}
+      (base: @{BASE}). Implement the task below, keep changes minimal and
+      focused, and run the project's test command: `@{TEST_CMD}`.
+      Commit your work with a clear message (git add -A && git commit). Do not
+      push. Do not touch these protected paths: @{PROTECTED}.
+      If you hit a product decision, a missing credential, or information that
+      is not in the repository, do NOT guess: write a file named .helm-ask.json
+      in the worktree root containing {"question": "...", "context": "..."}
+      and stop. When finished, reply with a short summary of what changed.
+
+      {input}
+    gate: test -f "@{CWD}/.helm-ask.json" || { git -C "@{CWD}" diff --quiet && test "$(git -C "@{CWD}" rev-list --count @{BASE}..HEAD)" != "0"; }
+    retries: 1
+    retry_on: [model_error]
+    timeout: @{TIMEOUT}
+  - id: protected
+    needs: [implement]
+    cmd: test -f "@{CWD}/.helm-ask.json" && { echo ASKED; exit 1; }; git -C "@{CWD}" diff --name-only @{BASE}...HEAD | python3 "@{HELM_REPO}/helm/check_protected.py" @{PROTECTED_ARGS}
+  - id: verify
+    needs: [protected]
+    cmd: cd "@{CWD}" && @{TEST_CMD}
+    timeout: @{TIMEOUT}

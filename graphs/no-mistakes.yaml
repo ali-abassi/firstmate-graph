@@ -1,0 +1,92 @@
+version: 1
+workflow: helm-no-mistakes
+cwd: @{CWD}
+workers: 2
+input:
+  required: true
+  description: helm brief (task, constraints, failure notes from earlier attempts)
+steps:
+  - id: plan
+    needs: []
+    model: @{MODEL_PLAN}
+    thinking: @{THINKING_PLAN}
+    prompt: |
+      Produce a short, concrete implementation plan for the task below: the
+      files likely involved, the steps in order, the tests that must pass, and
+      the risks. Do not write code. Be brief.
+
+      {input}
+  - id: implement
+    needs: [plan]
+    agent: true
+    model: @{MODEL_IMPLEMENT}
+    thinking: @{THINKING_IMPLEMENT}
+    prompt: |
+      You are working inside a disposable git worktree on branch @{BRANCH}
+      (base: @{BASE}). Implement the task below following the plan, keep
+      changes minimal and focused, and run the project's test command:
+      `@{TEST_CMD}`. Commit your work with a clear message (git add -A && git
+      commit). Do not push. Do not touch these protected paths: @{PROTECTED}.
+      If you hit a product decision, a missing credential, or information that
+      is not in the repository, do NOT guess: write a file named .helm-ask.json
+      in the worktree root containing {"question": "...", "context": "..."}
+      and stop. When finished, reply with a short summary of what changed.
+
+      PLAN:
+      {step.plan}
+
+      TASK:
+      {input}
+    gate: test -f "@{CWD}/.helm-ask.json" || { git -C "@{CWD}" diff --quiet && test "$(git -C "@{CWD}" rev-list --count @{BASE}..HEAD)" != "0"; }
+    retries: 1
+    retry_on: [model_error]
+    timeout: @{TIMEOUT}
+  - id: protected
+    needs: [implement]
+    cmd: test -f "@{CWD}/.helm-ask.json" && { echo ASKED; exit 1; }; git -C "@{CWD}" diff --name-only @{BASE}...HEAD | python3 "@{HELM_REPO}/helm/check_protected.py" @{PROTECTED_ARGS}
+  - id: verify
+    needs: [protected]
+    cmd: cd "@{CWD}" && @{TEST_CMD}
+    timeout: @{TIMEOUT}
+  - id: diff
+    needs: [verify]
+    cmd: git -C "@{CWD}" log --format='%h %s' @{BASE}..HEAD; echo; git -C "@{CWD}" diff @{BASE}...HEAD | head -c 200000
+  - id: review_correctness
+    needs: [diff]
+    model: @{MODEL_REVIEW_CORRECTNESS}
+    thinking: @{THINKING_REVIEW_CORRECTNESS}
+    prompt: |
+      You are a strict code reviewer. The task brief and the resulting diff are
+      below. Decide whether the diff correctly and completely implements the
+      brief without regressions. Reply with JSON only.
+
+      BRIEF:
+      {input}
+
+      DIFF:
+      {step.diff}
+    schema:
+      verdict: {type: string, enum: [accept, reject]}
+      notes: string
+    gate: python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["verdict"]=="accept" else 1)' "$OUT"
+    retries: 0
+  - id: review_adversarial
+    needs: [diff]
+    model: @{MODEL_REVIEW_ADVERSARIAL}
+    thinking: @{THINKING_REVIEW_ADVERSARIAL}
+    prompt: |
+      You are an adversarial reviewer. Try hard to break this change: security
+      holes, data loss, silent behaviour changes, untested paths, gate or CI
+      tampering, scope creep beyond the brief. Reject if you find a real
+      problem; accept only if you could not. Reply with JSON only.
+
+      BRIEF:
+      {input}
+
+      DIFF:
+      {step.diff}
+    schema:
+      verdict: {type: string, enum: [accept, reject]}
+      notes: string
+    gate: python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1]))["verdict"]=="accept" else 1)' "$OUT"
+    retries: 0

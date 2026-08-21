@@ -1,0 +1,25 @@
+version: 1
+workflow: helm-scout
+cwd: @{CWD}
+workers: 1
+input:
+  required: true
+  description: helm scout brief (question to investigate)
+steps:
+  - id: investigate
+    needs: []
+    agent: true
+    model: @{MODEL_SCOUT}
+    thinking: @{THINKING_SCOUT}
+    prompt: |
+      You are investigating a repository checked out at @{CWD} (branch
+      @{BRANCH}). This is READ-ONLY work: do not modify, create, or delete any
+      file inside the repository and do not commit. Answer the question below
+      with evidence (file paths, line references, commands you ran). Write the
+      full report as Markdown to {run}/report.md, then reply REPORT WRITTEN.
+
+      {input}
+    gate: test -s "$RUN/report.md" && git -C "@{CWD}" status --porcelain | grep -q . && exit 1 || test -s "$RUN/report.md"
+    retries: 1
+    retry_on: [model_error]
+    timeout: @{TIMEOUT}
