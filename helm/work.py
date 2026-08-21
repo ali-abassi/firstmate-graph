@@ -137,7 +137,8 @@ def _execute(it: dict, timeout: int) -> dict:
     steps = graphs.render(dp["graph"], d, cwd=wt, branch=it["branch"], project=project,
                           models=dp["models"], thinking=dp["thinking"], timeout=timeout)
     graphs.validate(steps)
-    summary = graphs.run(steps, brief, timeout + 60)
+    env = worktree.git_env(wt, d / "gitexclude")
+    summary = graphs.run(steps, brief, timeout + 60, env=env)
     it["attempts"] += 1
     it["runs"].append({"attempt": it["attempts"], "at": now(), "ok": bool(summary.get("ok")),
                        "run_dir": summary.get("run_dir"), "failed_ids": summary.get("failed_ids"),

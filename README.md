@@ -32,8 +32,10 @@ It borrows its operating contract from [firstmate](https://github.com/kunchengui
 six tasks, three repos, two workers in parallel, one worker that stops to ask a question,
 one inbox with everything in it, no repo touched until `promote --confirm`.
 
-**[`docs/evidence/live-run.md`](docs/evidence/live-run.md)** is a dated record of the same
-path against the real `piw` and a real model (`tests/test_live.py`, opt-in with `HELM_LIVE=1`).
+**[`docs/evidence/interactive-session.md`](docs/evidence/interactive-session.md)** is a
+transcript of `pi-firstmate` used for real: delegate, get told the truth when it failed,
+retry, merge on the captain's word. **[`live-run.md`](docs/evidence/live-run.md)** is the
+same path as an opt-in test (`HELM_LIVE=1 python3 -m unittest tests.test_live`).
 
 ```sh
 python3 -m unittest discover -s tests -v     # 16 tests, no tokens spent

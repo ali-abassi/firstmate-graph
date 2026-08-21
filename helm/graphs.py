@@ -50,14 +50,14 @@ def validate(steps: Path) -> None:
         raise HelmError(f"piw validate failed:\n{r.stdout}{r.stderr}")
 
 
-def run(steps: Path, brief: Path, timeout: int) -> dict:
+def run(steps: Path, brief: Path, timeout: int, env: dict | None = None) -> dict:
     cmd = [piw_bin(), "run", str(steps), "--input-file", str(brief), "--json",
            "--no-cache", "--timeout", str(timeout)]
     log(f"exec {' '.join(shlex.quote(c) for c in cmd)}")
     # stdin MUST be closed: `pi -p` blocks forever on an open inherited pipe (fine in a
     # terminal, fatal under a daemon). Own process group so a timeout kills pi too.
     proc = subprocess.Popen(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            stdin=subprocess.DEVNULL, cwd=str(steps.parent), start_new_session=True)
+                            stdin=subprocess.DEVNULL, cwd=str(steps.parent), start_new_session=True, env=env)
     try:
         stdout, stderr = proc.communicate(timeout=timeout + 120)
     except subprocess.TimeoutExpired:

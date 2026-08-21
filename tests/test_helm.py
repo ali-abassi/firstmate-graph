@@ -158,6 +158,23 @@ class HelmTests(unittest.TestCase):
         self.assertIn("stopped", self.helm("down").stdout)
         self.assertIn("stopped", self.helm("status").stdout)
 
+    def test_ignored_dependency_dirs_are_linked_into_worktree_not_committed(self):
+        (self.proj / ".gitignore").write_text("node_modules/\n")                       # root ignores node_modules only
+        (self.proj / "node_modules").mkdir(); (self.proj / "node_modules" / "dep.js").write_text("x")
+        (self.proj / ".venv").mkdir(); (self.proj / ".venv" / "marker").write_text("x")
+        (self.proj / ".venv" / ".gitignore").write_text("*\n")                           # like `python -m venv`
+        (self.proj / "vendor").mkdir(); (self.proj / "vendor" / "tracked.txt").write_text("x")   # NOT ignored
+        subprocess.run(["git", "-C", str(self.proj), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.proj), "commit", "-qm", "deps"], check=True)
+        self.add(mode="local-only")
+        it = self.task(); self.helm("run-once")
+        wt = self.home / "worktrees" / "p" / it["id"]
+        self.assertTrue((wt / "node_modules").is_symlink() and (wt / "node_modules" / "dep.js").exists())
+        self.assertTrue((wt / ".venv").is_symlink())
+        self.assertFalse((wt / "vendor").is_symlink(), "tracked dirs come from git, not links")
+        files = subprocess.run(["git", "-C", str(wt), "diff", "--name-only", "main...HEAD"], capture_output=True, text=True).stdout
+        self.assertNotIn("node_modules", files); self.assertNotIn(".venv", files)
+
 
 if __name__ == "__main__":
     unittest.main()
