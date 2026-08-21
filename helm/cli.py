@@ -113,29 +113,67 @@ HARNESS = {
 }
 
 
-def _isolated_pi_home() -> Path:
-    """A Pi config dir that belongs to the first mate alone.
+PI_HOME_SETTINGS = {
+    "defaultProvider": "openai-codex", "defaultModel": "gpt-5.6-sol", "defaultThinkingLevel": "medium",
+    "enabledModels": ["openai-codex/gpt-5.6-sol", "openai-codex/gpt-5.6-luna", "openai-codex/gpt-5.6-terra",
+                      "openai-codex/gpt-5.5", "openai-codex/gpt-5.4", "openai-codex/gpt-5.4-mini"],
+    "quietStartup": True,
+}
 
-    Nothing from the captain's personal Pi setup (extensions, AGENTS.md, prompts, skills,
-    themes) is inherited. Only credentials and the model catalog are linked in, so the
-    providers the captain already logged into keep working. Project-local files in this
-    repo (AGENTS.md, .pi/extensions/firstmate.ts) are what make it the first mate.
-    """
-    src = Path(os.environ.get("PI_CODING_AGENT_DIR", "~/.pi/agent")).expanduser()
-    dst = home() / "pi"
+
+def pi_home() -> Path:
+    """The first mate's own Pi config dir. Nothing from the captain's Pi is inherited."""
+    return home() / "pi"
+
+
+def _isolated_pi_home() -> Path:
+    dst = pi_home()
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ("auth.json", "models.json", "models-store.json"):
-        link = dst / name
-        if (src / name).exists() and not link.exists():
-            link.symlink_to(src / name)
-    (dst / "README").write_text("first mate's private Pi home — managed by helm; only auth/models are linked from your Pi.\n")
     settings = dst / "settings.json"
     current = json.loads(settings.read_text()) if settings.exists() else {}
     if "defaultModel" not in current:                      # seed once; the captain's later choices stick
-        provider, model = dispatch.load()["models"]["plan"].split("/", 1)
-        current.update({"defaultProvider": provider, "defaultModel": model, "defaultThinkingLevel": "medium", "quietStartup": True})
+        current.update(PI_HOME_SETTINGS)
         settings.write_text(json.dumps(current, indent=2) + "\n")
+    (dst / "README").write_text("first mate's private Pi home — managed by helm. Log in here with `helm setup`.\n")
     return dst
+
+
+def codex_ready() -> bool:
+    if not shutil.which("pi"):
+        return False
+    r = subprocess.run(["pi", "auth", "check", "--provider", "openai-codex"], text=True, capture_output=True,
+                       env={**os.environ, "PI_CODING_AGENT_DIR": str(_isolated_pi_home())}, stdin=subprocess.DEVNULL)
+    return r.stdout.strip() == "ready"
+
+
+def cmd_setup(a):
+    """Own config, own login: connect the first mate to the Codex subscription."""
+    dst = _isolated_pi_home()
+    dispatch.load()
+    if a.import_login:
+        src = Path(os.environ.get("HELM_IMPORT_PI_DIR", "~/.pi/agent")).expanduser() / "auth.json"
+        try:
+            creds = json.loads(src.read_text()).get("openai-codex")
+        except (OSError, json.JSONDecodeError):
+            creds = None
+        if not creds:
+            raise HelmError(f"no openai-codex login found in {src}")
+        auth = dst / "auth.json"
+        current = json.loads(auth.read_text()) if auth.exists() else {}
+        current["openai-codex"] = creds
+        auth.write_text(json.dumps(current, indent=2) + "\n"); auth.chmod(0o600)
+    if codex_ready():
+        out({"ready": True, "pi_home": str(dst)}, a.json, f"✓ connected to the Codex subscription · pi home {dst}")
+        return
+    if a.json or not sys.stdin.isatty():
+        raise HelmError("not logged in to Codex. Run `helm setup` in a terminal, or `helm setup --import-login` to copy an existing Pi login")
+    print("\n  ⚓ one-time setup — connect the first mate to your Codex subscription\n"
+          "     Pi will open. Type  /login  and choose  OpenAI Codex , finish in the browser, then  /exit\n", file=sys.stderr)
+    subprocess.run(["pi"], env={**os.environ, "PI_CODING_AGENT_DIR": str(dst)}, cwd=str(dst))
+    if codex_ready():
+        out({"ready": True, "pi_home": str(dst)}, False, f"✓ connected to the Codex subscription · pi home {dst}")
+    else:
+        raise HelmError("still not logged in to Codex; run `helm setup` again")
 
 
 def cmd_captain(a):
@@ -148,7 +186,8 @@ def cmd_captain(a):
     if not daemon_pid() and not (herdr.inside() and have_tabs):
         cmd_up(argparse.Namespace(json=False, interval=20, workers=a.workers))
     if a.harness == "pi":
-        os.environ["PI_CODING_AGENT_DIR"] = str(_isolated_pi_home())
+        if not codex_ready():
+            cmd_setup(argparse.Namespace(json=False, import_login=False))
         print(f"  ⚓ workers {'in herdr tabs' if herdr.inside() else 'up'} · first mate coming on deck…", file=sys.stderr)
     else:
         print(board.banner(daemon_pid()))
@@ -317,6 +356,7 @@ def cmd_doctor(a):
     for b in ("git", "piw", "pi", "gh"):
         chk(b, shutil.which(b), shutil.which(b) or "not on PATH")
     chk("HELM_HOME", True, str(home()))
+    chk("codex login", codex_ready(), str(pi_home()) if codex_ready() else "run `helm setup`")
     chk("projects", projects_file().exists(), str(projects_file()))
     cfg = dispatch.load()
     wanted = set(cfg["models"].values()) | {m for r in cfg["rules"] for m in r.get("models", {}).values()}
@@ -368,6 +408,8 @@ def main(argv=None):
     p = S("daemon", cmd_daemon, "execute forever"); p.add_argument("--owner", default="daemon"); p.add_argument("--interval", type=int, default=20)
     p.add_argument("--timeout", type=int, default=3600); p.add_argument("--once-idle", type=int, default=0, help="exit after N idle polls (tests)")
     S("dispatch", cmd_dispatch, "show dispatch table")
+    p = S("setup", cmd_setup, "connect the first mate to the Codex subscription (own config, own login)")
+    p.add_argument("--import-login", action="store_true", help="copy an existing Pi Codex login instead of logging in again")
     p = S("up", cmd_up, "start workers (herdr tabs when inside herdr, else background)"); p.add_argument("--interval", type=int, default=20)
     p.add_argument("--workers", type=int, default=2, help="worker tabs to open inside herdr")
     p = S("watch", cmd_watch, "live fleet board"); p.add_argument("--interval", type=float, default=2.0); p.add_argument("--once", action="store_true")
@@ -379,6 +421,7 @@ def main(argv=None):
     p.add_argument("--workers", type=int, default=2)
     p = S("doctor", cmd_doctor, "check tools, models, graphs"); p.add_argument("--probe", action="store_true", help="live 1-word call per model (costs a few tokens)")
     a = ap.parse_args(argv)
+    os.environ["PI_CODING_AGENT_DIR"] = str(pi_home())
     try:
         return a.fn(a)
     except HelmError as e:

@@ -20,10 +20,10 @@ class DispatchTests(Isolated):
         from helm import dispatch
         proj = {"id": "api", "mode": "no-mistakes"}
         d = dispatch.resolve({"kind": "ship", "labels": ["cheap"]}, proj)
-        self.assertEqual(d["rule"], "hotfix-cheap")
+        self.assertEqual(d["rule"], "cheap")
         self.assertEqual(d["graph"], "no-mistakes")                       # graph falls back to project mode
         self.assertEqual(d["models"]["implement"], "openai-codex/gpt-5.4-mini")
-        self.assertEqual(d["models"]["review_correctness"], "baseten/deepseek-ai/DeepSeek-V4-Pro")  # default kept
+        self.assertEqual(d["models"]["review_correctness"], "openai-codex/gpt-5.6-sol")  # default kept
 
     def test_scout_ignores_mode(self):
         from helm import dispatch
@@ -126,19 +126,31 @@ class PiExtensionTests(unittest.TestCase):
         self.assertIn("promote", agents)
 
 
-class IsolatedPiHomeTests(Isolated):
-    def test_first_mate_gets_its_own_pi_home_with_only_auth_linked(self):
+class OwnPiHomeTests(Isolated):
+    def test_first_mate_has_its_own_pi_home_and_inherits_nothing(self):
         src = self.home / "captain-pi"; src.mkdir()
-        (src / "auth.json").write_text("{}"); (src / "models.json").write_text("{}")
+        (src / "auth.json").write_text(json.dumps({"openai-codex": {"access": "tok"}, "anthropic": {"x": 1}}))
         (src / "AGENTS.md").write_text("# personal agent"); (src / "extensions").mkdir()
-        os.environ["PI_CODING_AGENT_DIR"] = str(src)
+        os.environ["PI_CODING_AGENT_DIR"] = str(src); os.environ["HELM_IMPORT_PI_DIR"] = str(src)
         from helm.cli import _isolated_pi_home
         dst = _isolated_pi_home()
-        self.assertTrue((dst / "auth.json").is_symlink() and (dst / "models.json").is_symlink())
         self.assertFalse((dst / "AGENTS.md").exists()); self.assertFalse((dst / "extensions").exists())
+        self.assertFalse((dst / "auth.json").exists(), "no login is inherited silently")
         settings = json.loads((dst / "settings.json").read_text())
-        self.assertEqual((settings["defaultProvider"], settings["defaultModel"]), ("openai-codex", "gpt-5.5"))
+        self.assertEqual((settings["defaultProvider"], settings["defaultModel"]), ("openai-codex", "gpt-5.6-sol"))
+        self.assertTrue(all(m.startswith("openai-codex/") for m in settings["enabledModels"]))
         (dst / "settings.json").write_text(json.dumps({"defaultModel": "mine", "defaultProvider": "x"}))
         _isolated_pi_home()                                   # second run keeps the captain's choice
         self.assertEqual(json.loads((dst / "settings.json").read_text())["defaultModel"], "mine")
-        del os.environ["PI_CODING_AGENT_DIR"]
+        # --import-login copies only the Codex credential
+        r = subprocess.run([sys.executable, str(REPO / "bin" / "helm"), "setup", "--import-login", "--json"],
+                           env={**os.environ}, text=True, capture_output=True)
+        auth = json.loads((dst / "auth.json").read_text())
+        self.assertEqual(list(auth), ["openai-codex"])
+        del os.environ["PI_CODING_AGENT_DIR"]; del os.environ["HELM_IMPORT_PI_DIR"]
+
+    def test_every_helm_command_runs_in_the_first_mates_pi_home(self):
+        r = subprocess.run([sys.executable, "-c", "import os,sys; sys.argv=['helm','status','--json']; sys.path.insert(0, sys.argv[0]); "
+                            "from helm import cli; cli.main(['status','--json']); print('DIR='+os.environ['PI_CODING_AGENT_DIR'])"],
+                           cwd=str(REPO), env={**os.environ, "HELM_HOME": str(self.home)}, text=True, capture_output=True)
+        self.assertIn(f"DIR={self.home.resolve()}/pi", r.stdout)

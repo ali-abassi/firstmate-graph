@@ -45,11 +45,14 @@ python3 -m unittest discover -s tests -v     # 16 tests, no tokens spent
 
 ```sh
 git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph && ~/firstmate-graph/install.sh
+helm setup          # one-time: log the first mate into your Codex subscription
 ```
 
-Needs [pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`) and `pi` logged in to a
-provider. `gh` only for PR modes. Defaults use the Codex subscription and DeepSeek;
-edit `~/.helm/dispatch.json` to change models.
+Opinionated: it runs on the **Codex subscription** (GPT-5.6 Sol by default), in its own
+Pi config home (`~/.helm/pi`) with its own login — nothing from your personal Pi setup is
+inherited. Needs [pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`) and `pi`;
+`gh` only for PR modes. Other providers: `/login` inside `pi-firstmate`, then point phases
+at them in `~/.helm/dispatch.json`.
 
 ## Use
 
