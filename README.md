@@ -3,34 +3,34 @@
 [![tests](https://github.com/ali-abassi/firstmate-graph/actions/workflows/tests.yml/badge.svg)](https://github.com/ali-abassi/firstmate-graph/actions/workflows/tests.yml)
 [![license](https://img.shields.io/badge/license-MIT-11110f)](LICENSE)
 
-**One agent to talk to. Many agents doing the work. One place to see results.**
+**You talk to one agent. It runs a crew across your repos and comes back only when it needs you.**
 
 ```
-you ──► liaison agent ──► helm queue ──► workers (one per repo at a time, many repos at once)
-                                            │
-you ◄── helm inbox ◄────────────────────────┘   questions · finished branches · failures
+you ──► first mate ──► crew: one agent per task, each in its own copy of the repo
+                          implement → test → review, steps it cannot skip
+you ◄── first mate ◄── questions · finished branches · failures
 ```
 
-You describe work. The liaison queues it. Workers run each task in its own git worktree,
-through a fixed sequence of steps (implement → verify → review) that a model cannot skip.
-Everything comes back through one inbox. Nothing merges until you say so.
+You describe the outcome. The first mate hands it to a worker, watches the crew in the
+background, and reports when something is ready or needs a decision. Nothing merges until
+you say so. Runs on your Codex subscription.
 
 ## Why
 
-Coding agents are good at one task. Running ten of them across five repos turns you into
-a tab-juggler. firstmate graph gives you a single thread: you talk to one agent, code
-decides what runs and when, models only work inside the steps, and the evidence of every
-run is kept on disk.
+One coding agent is easy. Five of them across five repos means five terminals, five
+half-remembered contexts, and you as the scheduler. firstmate graph gives you one
+conversation instead: the first mate keeps the thread, code decides what runs and in what
+order, and every run leaves evidence on disk.
 
-It borrows its operating contract from [firstmate](https://github.com/kunchenguid/firstmate)
-([our fork](https://github.com/ali-abassi/firstmate)) and runs the steps with
-[pi-graph](https://github.com/ali-abassi/pi-graph).
+It keeps the operating contract of [firstmate](https://github.com/kunchenguid/firstmate)
+([fork](https://github.com/ali-abassi/firstmate)) and runs each task as a
+[pi-graph](https://github.com/ali-abassi/pi-graph) workflow.
 
 ## Proof
 
 **[`tests/test_one_thread.py`](tests/test_one_thread.py)** runs the whole idea on every push:
 six tasks, three repos, two workers in parallel, one worker that stops to ask a question,
-one inbox with everything in it, no repo touched until `promote --confirm`.
+one inbox with everything in it, no repo touched until the captain says merge.
 
 **[`docs/evidence/interactive-session.md`](docs/evidence/interactive-session.md)** is a
 transcript of `pi-firstmate` used for real: delegate, get told the truth when it failed,
@@ -38,7 +38,7 @@ retry, merge on the captain's word. **[`live-run.md`](docs/evidence/live-run.md)
 same path as an opt-in test (`HELM_LIVE=1 python3 -m unittest tests.test_live`).
 
 ```sh
-python3 -m unittest discover -s tests -v     # 16 tests, no tokens spent
+python3 -m unittest discover -s tests -v     # 30 tests, no tokens spent
 ```
 
 ## Install
@@ -48,10 +48,10 @@ git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph && ~/f
 pi-firstmate
 ```
 
-The first run connects to your **Codex subscription** (GPT-5.6 Sol by default) in the
-first mate's own Pi home — nothing from your personal Pi setup is inherited. Needs
-[pi-graph](https://github.com/ali-abassi/pi-graph) (`piw`) and `pi`; `gh` only if you
-want PRs.
+Requires [Pi](https://github.com/earendil-works/pi) and [pi-graph](https://github.com/ali-abassi/pi-graph)
+on your PATH, git, and a Codex subscription (`gh` only if you want PRs). The first run
+reuses the Codex login from your Pi, in a config home of its own — nothing from your
+personal Pi setup is inherited. macOS and Linux.
 
 ## Use
 
@@ -83,11 +83,15 @@ Claude Code. That's the whole surface; the machinery underneath is in
 
 | | |
 |---|---|
-| **Mode** per repo | `local-only` leaves a branch · `direct-pr` opens a PR · `no-mistakes` adds a plan, a protected-path gate and two reviews first |
-| **Authority** per repo | `0` investigate · `1` build · `2` open PRs · `3` merge on your word — raised only when you ask |
+| **Delivery** per repo | a branch for you to merge (default) · a pull request · or the careful mode: plan, protected-path gate, two independent reviews, then a PR. You pick by saying so ("open PRs for api") |
+| **Authority** per repo | investigate only · build · open PRs · merge on your word. Starts at build; raised only when you ask |
 | **Models** | GPT-5.6 Sol by default; every model your login offers is available (`/model`), and each step's model changes when you ask ("use luna for implementation"). A drifted model fails the step instead of silently swapping |
 | **Retries** | a failed gate discards the worktree, keeps the evidence, retries up to 3 times |
 | **Questions** | a worker that needs a decision stops and asks; it does not guess |
 | **Evidence** | every task keeps its brief, exact graph, every step's output, tokens and cost on disk; the first mate quotes it |
+
+## Status
+
+Early and opinionated, used daily by one person. Issues and PRs welcome.
 
 MIT.

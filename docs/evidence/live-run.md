@@ -1,5 +1,7 @@
 # Live run — 2026-08-21 11:46 UTC
 
+> Commands shown are the first mate's internal tooling; the captain only ever talks.
+
 `tests/test_live.py` against the real `piw` and model `openai-codex/gpt-5.4-mini`.
 
 - task: Implement fizzbuzz(n) in fizz.py so test_fizz.py passes; return str(n) for non-multiples. Do not modify test_fizz.py.

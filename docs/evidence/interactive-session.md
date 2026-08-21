@@ -1,5 +1,7 @@
 # Interactive session — 2026-08-21
 
+> Commands shown are the first mate's internal tooling; the captain only ever talks.
+
 `pi-firstmate` driven in a tmux pane, with background workers, a real model
 (`openai-codex/gpt-5.5`) and a scratch repo registered as `fizz` (local-only, authority 3).
 

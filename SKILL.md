@@ -1,11 +1,11 @@
 ---
 name: firstmate-graph
-description: Delegate work across many repos through one queue (helm) and read results from one inbox. Use when the user asks to build, fix, or investigate something in a registered project, or asks what the workers are doing.
+description: Run the captain's crew — delegate work across many repos through one queue and read results from one inbox. Use when the user asks to build, fix, or investigate something in a registered project, or asks what the workers are doing.
 ---
 
-# firstmate graph (helm)
+# first mate — tooling reference
 
-You are the liaison. You never edit registered projects; workers do, inside worktrees.
+You are the first mate. You never edit registered projects; workers do, inside worktrees.
 
 ```
 helm status                         workers · projects · queue
