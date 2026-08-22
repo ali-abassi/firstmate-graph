@@ -181,7 +181,10 @@ def cmd_captain(a):
     """One command: workers up, banner, then the liaison in front of you."""
     cmd = HARNESS.get(a.harness) or [a.harness]
     if not shutil.which(cmd[0]):
-        raise HelmError(f"{cmd[0]} is not on PATH")
+        hint = {"pi": "install Pi:  npm install -g @earendil-works/pi-coding-agent",
+                "claude": "install Claude Code:  npm install -g @anthropic-ai/claude-code",
+                "codex": "install Codex:  npm install -g @openai/codex"}.get(cmd[0], "")
+        raise HelmError(f"{cmd[0]} is not installed. {hint}".strip())
     from .util import read_json
     have_tabs = any(t["kind"] == "worker" for t in read_json(home() / "herdr.json", {"tabs": []})["tabs"])
     if not daemon_pid() and not (herdr.inside() and have_tabs):

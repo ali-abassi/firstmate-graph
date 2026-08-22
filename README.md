@@ -66,14 +66,17 @@ python3 -m unittest discover -s tests -v     # 30 tests, no tokens spent
 ## Install
 
 ```sh
-git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph && ~/firstmate-graph/install.sh
+curl -fsSL https://raw.githubusercontent.com/ali-abassi/firstmate-graph/main/install.sh | bash
 pi-firstmate
 ```
 
-Requires [Pi](https://github.com/earendil-works/pi) (`npm i -g @earendil-works/pi-coding-agent`),
-git, Python 3.10+, and a Codex subscription (`gh` only if you want PRs). Everything else
-is in this repo. The first run reuses the Codex login from your Pi, in a config home of
-its own — nothing from your personal Pi setup is inherited. macOS and Linux.
+That's it. The installer checks what you have, builds a private runtime, puts
+`pi-firstmate` on your PATH, and tells you the one next step. The first run connects to
+your Codex subscription (it reuses the login from your Pi if there is one).
+
+You need [Pi](https://github.com/earendil-works/pi) (`npm i -g @earendil-works/pi-coding-agent`),
+git, Python 3.10+, and a Codex subscription. `gh` only if you want pull requests.
+macOS and Linux. Prefer a checkout? `git clone … ~/firstmate-graph && ~/firstmate-graph/install.sh`.
 
 ## Use
 
