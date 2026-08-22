@@ -140,7 +140,7 @@ def _execute(it: dict, timeout: int) -> dict:
     env = worktree.git_env(wt, d / "gitexclude")
     tab = None
     if herdr.inside():
-        import shlex, sys
+        import shlex
         tab = herdr.open_tab(f"⚙ {project['id']}: {it['text'].splitlines()[0][:28]}",
                              f"{shlex.quote(str(Path(__file__).resolve().parents[1] / 'bin' / 'helm'))} tail {it['id']}")
         if tab:

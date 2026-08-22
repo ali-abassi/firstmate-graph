@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 from . import registry, dispatch, work, deliver, worktree, herdr, board, __version__
-from .paths import home, projects_file, dispatch_file, work_root, GRAPHS
+from .paths import home, projects_file, dispatch_file, GRAPHS
 from .util import HelmError, log
 
 

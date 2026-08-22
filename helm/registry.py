@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from .paths import projects_file
-from .util import read_json, write_json, git, HelmError
+from .util import read_json, write_json, HelmError
 
 MODES = ("no-mistakes", "direct-pr", "local-only")
 # Authority: what helm may do on its own for this project. Only a human raises it.

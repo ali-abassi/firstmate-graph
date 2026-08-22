@@ -15,6 +15,27 @@ You describe the outcome. The first mate hands it to a worker, watches the crew 
 background, and reports when something is ready or needs a decision. Nothing merges until
 you say so. Runs on your Codex subscription.
 
+## On deck
+
+```
+    ·~    ≈~·    ≈ ≈≈ ~     ✦ ~ ≈  ~ ~ ·~        ~  ≈≈ ≈~     ~   ·~~~       ✦~   ≈  ~ ··
+  ·~· ~     ~  ~~  ~ ~~✦       ~· ~≈ ~   ≈     ~    ~≈     ~~  ~≈ ~✦≈≈ ≈      ·~   ~   ~
+                           ⚓  F I R S T   M A T E  ⚓
+                 2 projects · workers in background · 1 need you
+                                /fleet  ·  /inbox
+  ──────────────────────────────  ──⚓──  ───────────────────────────────────
+
+ you ›  fix the flaky login test in api, and find out why the web bundle is 4 MB
+        ~~⛵~~~  hailing the crew
+
+ Two items under way, captain. I'll report when they land or need a decision.
+ ──────────────────────────────────────────────────── ⚓ 2 under way ─
+```
+
+That's the whole interface: a Pi session with a sea on top, a boat while it thinks, and a
+footer that tells you how many hands are busy. The crew works in the background; the first
+mate wakes itself when there's news.
+
 ## Why
 
 One coding agent is easy. Five of them across five repos means five terminals, five

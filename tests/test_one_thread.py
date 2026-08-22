@@ -8,7 +8,7 @@ guess. The liaison sees that — and everything else — in a single inbox, answ
 the work completes. Nobody touches the captain's checkouts until the captain says so.
 """
 import _gitenv  # noqa: F401  (git hygiene for temp repos)
-import json, os, subprocess, sys, tempfile, time, unittest
+import json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
