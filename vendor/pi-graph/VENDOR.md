@@ -7,3 +7,6 @@ the Pi extension live upstream.
 
 To update: copy those three directories plus VERSION, LICENSE and requirements.txt from
 a pi-graph checkout, run the test suite, and note the new commit here.
+
+`piw version` reports "version unavailable" in the bundle because the upstream identity check
+expects files we do not ship (extension, docs); every runtime command works.
