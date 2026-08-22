@@ -1,5 +1,8 @@
 """Unit tests for the decisions helm makes without a model: dispatch, rendering, authority."""
-import _gitenv  # noqa: F401  (git hygiene for temp repos)
+try:
+    import _gitenv  # noqa: F401  (git hygiene for temp repos)
+except ImportError:
+    from tests import _gitenv  # noqa: F401
 import json, os, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 
@@ -61,9 +64,9 @@ class RenderTests(Isolated):
                 self.assertIn("'a b.txt'", text)                                 # protected globs are shell-quoted
                 self.assertIn("npm test", text)
 
-    @unittest.skipUnless(shutil.which("piw"), "piw not installed")
-    def test_rendered_graphs_pass_real_piw_validate(self):
+    def test_rendered_graphs_pass_the_bundled_runner_validate(self):
         from helm import graphs, dispatch
+        os.environ.pop("HELM_PIW", None)
         cfg = dispatch.load()
         repo = self.home / "repo"; repo.mkdir()
         subprocess.run(["git", "init", "-q", str(repo)], check=True)
@@ -71,7 +74,7 @@ class RenderTests(Isolated):
         for g in ("local-only", "direct-pr", "no-mistakes", "scout"):
             steps = graphs.render(g, self.home / g, cwd=repo, branch="helm/x", project=proj,
                                   models=cfg["models"], thinking=cfg["thinking"], timeout=42)
-            r = subprocess.run(["piw", "validate", str(steps)], text=True, capture_output=True)
+            r = subprocess.run([graphs.piw_bin(), "validate", str(steps)], text=True, capture_output=True)
             self.assertEqual(r.returncode, 0, f"{g}: {r.stdout}{r.stderr}")
 
 

@@ -45,7 +45,8 @@ order, and every run leaves evidence on disk.
 
 It keeps the operating contract of [firstmate](https://github.com/kunchenguid/firstmate)
 ([fork](https://github.com/ali-abassi/firstmate)) and runs each task as a
-[pi-graph](https://github.com/ali-abassi/pi-graph) workflow.
+[pi-graph](https://github.com/ali-abassi/pi-graph) workflow — the runner is bundled in
+`vendor/pi-graph`, so there is nothing else to install.
 
 ## Proof
 
@@ -56,7 +57,7 @@ one inbox with everything in it, no repo touched until the captain says merge.
 **[`docs/evidence/interactive-session.md`](docs/evidence/interactive-session.md)** is a
 transcript of `pi-firstmate` used for real: delegate, get told the truth when it failed,
 retry, merge on the captain's word. **[`live-run.md`](docs/evidence/live-run.md)** is the
-same path as an opt-in test (`HELM_LIVE=1 python3 -m unittest tests.test_live`).
+same path as an opt-in test (`HELM_LIVE=1 .venv/bin/python -m unittest tests.test_live`).
 
 ```sh
 python3 -m unittest discover -s tests -v     # 30 tests, no tokens spent
@@ -69,10 +70,10 @@ git clone https://github.com/ali-abassi/firstmate-graph ~/firstmate-graph && ~/f
 pi-firstmate
 ```
 
-Requires [Pi](https://github.com/earendil-works/pi) and [pi-graph](https://github.com/ali-abassi/pi-graph)
-on your PATH, git, and a Codex subscription (`gh` only if you want PRs). The first run
-reuses the Codex login from your Pi, in a config home of its own — nothing from your
-personal Pi setup is inherited. macOS and Linux.
+Requires [Pi](https://github.com/earendil-works/pi) (`npm i -g @earendil-works/pi-coding-agent`),
+git, Python 3.10+, and a Codex subscription (`gh` only if you want PRs). Everything else
+is in this repo. The first run reuses the Codex login from your Pi, in a config home of
+its own — nothing from your personal Pi setup is inherited. macOS and Linux.
 
 ## Use
 

@@ -1,20 +1,18 @@
-# Live run — 2026-08-21 11:46 UTC
-
-> Commands shown are the first mate's internal tooling; the captain only ever talks.
+# Live run — 2026-08-22 00:09 UTC
 
 `tests/test_live.py` against the real `piw` and model `openai-codex/gpt-5.4-mini`.
 
 - task: Implement fizzbuzz(n) in fizz.py so test_fizz.py passes; return str(n) for non-multiples. Do not modify test_fizz.py.
-- graph: `local-only` · rule `hotfix-cheap`
-- wall time: 26s · tokens: 22241 · cost: $0.007958
+- graph: `local-only` · rule `cheap`
+- wall time: 18s · tokens: 11320 · cost: $0.005024
 - result: verify gate green → `ready` → `promote --confirm` fast-forwarded `main`
 
 pi-graph ledger:
 
 ```
-- 14:46:26 ledger:
-  implement          gpt-5.4-mini       24.2s    22241 tok  $0.0080
+- 03:09:48 ledger:
+  implement          gpt-5.4-mini       16.4s    11320 tok  $0.0050
   protected          cmd                 0.0s        0 tok  $0.0000
   verify             cmd                 1.2s        0 tok  $0.0000
-  TOTAL 25s compute · 22241 tok · $0.0080 · ledger.json written
+  TOTAL 18s compute · 11320 tok · $0.0050 · ledger.json written
 ```

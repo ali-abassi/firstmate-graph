@@ -347,7 +347,6 @@ def cmd_dispatch(a):
     cfg = dispatch.load()
     if a.set:
         from .util import write_json
-        from .paths import dispatch_file
         for spec in a.set:
             phase, _, model = spec.partition("=")
             if phase not in dispatch.PHASES or "/" not in model:
@@ -370,11 +369,15 @@ def cmd_doctor(a):
         nonlocal ok
         ok &= bool(good)
         print(f"{'ok  ' if good else 'FAIL'} {name} {detail}")
-    for b in ("git", "piw", "pi", "gh"):
+    for b in ("git", "pi", "gh"):
         chk(b, shutil.which(b), shutil.which(b) or "not on PATH")
+    from . import graphs as _gr
+    r = subprocess.run([_gr.piw_bin(), "schema", "--json"], capture_output=True, text=True)
+    chk("bundled runner", r.returncode == 0, _gr.piw_bin() if r.returncode == 0 else (r.stderr.strip()[-200:] or "run install.sh"))
     chk("HELM_HOME", True, str(home()))
     chk("codex login", codex_ready(), str(pi_home()) if codex_ready() else "run `helm setup`")
-    chk("projects", projects_file().exists(), str(projects_file()))
+    n = len(registry.load()["projects"])
+    chk("projects", True, f"{n} registered" if n else 'none yet — tell the first mate "add ~/code/my-repo"')
     cfg = dispatch.load()
     wanted = set(cfg["models"].values()) | {m for r in cfg["rules"] for m in r.get("models", {}).values()}
     have = set()

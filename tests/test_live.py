@@ -3,7 +3,10 @@
 Spends a few cents on the cheapest configured model. Writes what happened to
 docs/evidence/live-run.md so the repo carries a dated record of a real run.
 """
-import _gitenv  # noqa: F401  (git hygiene for temp repos)
+try:
+    import _gitenv  # noqa: F401  (git hygiene for temp repos)
+except ImportError:
+    from tests import _gitenv  # noqa: F401
 import json, os, shutil, subprocess, sys, tempfile, time, unittest
 from pathlib import Path
 
@@ -11,8 +14,8 @@ REPO = Path(__file__).resolve().parents[1]
 HELM = [sys.executable, str(REPO / "bin" / "helm")]
 
 
-@unittest.skipUnless(os.environ.get("HELM_LIVE") == "1" and shutil.which("piw") and shutil.which("pi"),
-                     "set HELM_LIVE=1 with piw and pi installed to run the live test")
+@unittest.skipUnless(os.environ.get("HELM_LIVE") == "1" and shutil.which("pi"),
+                     "set HELM_LIVE=1 with pi installed to run the live test")
 class LiveTest(unittest.TestCase):
     def test_real_piw_real_model_local_only(self):
         tmp = Path(tempfile.mkdtemp()); home = tmp / "home"; repo = tmp / "repo"; repo.mkdir()
@@ -28,6 +31,7 @@ class LiveTest(unittest.TestCase):
         def helm(*a):
             r = subprocess.run(HELM + list(a), env=env, text=True, capture_output=True)
             self.assertEqual(r.returncode, 0, f"helm {' '.join(a)}\n{r.stdout}\n{r.stderr}"); return r.stdout
+        helm("setup", "--json")                     # own Pi home; reuses the Codex login from your Pi
         helm("add", str(repo), "--id", "live", "--test", test_cmd, "--mode", "local-only", "--authority", "3", "--protected", "test_fizz.py")
         wid = json.loads(helm("task", "live", "Implement fizzbuzz(n) in fizz.py so test_fizz.py passes; return str(n) for non-multiples. Do not modify test_fizz.py.", "--labels", "cheap", "--json"))["id"]
         t0 = time.time(); helm("run-once", "--timeout", "600"); secs = time.time() - t0

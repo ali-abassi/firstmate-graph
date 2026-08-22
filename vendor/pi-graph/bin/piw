@@ -1,0 +1,13 @@
+#!/bin/sh
+# Bundled pi-graph runner. Uses the repo's .venv (created by install.sh), else system python3.
+set -eu
+script=$0
+while [ -L "$script" ]; do
+  target=$(readlink "$script")
+  case "$target" in /*) script=$target ;; *) script=$(dirname -- "$script")/$target ;; esac
+done
+root=$(CDPATH= cd -- "$(dirname -- "$script")/.." && pwd)
+repo=$(CDPATH= cd -- "$root/../.." && pwd)
+python_bin=${PI_GRAPH_PYTHON:-"$repo/.venv/bin/python"}
+[ -x "$python_bin" ] || python_bin=python3
+exec "$python_bin" "$root/scripts/piw.py" "$@"

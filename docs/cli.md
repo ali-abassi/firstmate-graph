@@ -21,5 +21,5 @@ State lives in `$HELM_HOME` (default `~/.helm`): `projects.json`, `dispatch.json
 `work/<id>/` (item state, brief, rendered graph, pi-graph run bundles), `worktrees/`,
 `pi/` (the first mate's own Pi config and login), `helm.log`.
 
-Graphs are pi-graph workflows in `graphs/`; `piw` is the only runner. Tests drive the
+Graphs are pi-graph workflows in `graphs/`; the bundled runner `vendor/pi-graph/bin/piw` is the only runner. Tests drive the
 whole pipeline against `tests/fake_piw.py` and `tests/fake_herdr.py` without spending tokens.

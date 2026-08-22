@@ -1,5 +1,8 @@
 """Inside Herdr the fleet is visible: a board tab, worker tabs, one tab per running task, notifications."""
-import _gitenv  # noqa: F401  (git hygiene for temp repos)
+try:
+    import _gitenv  # noqa: F401  (git hygiene for temp repos)
+except ImportError:
+    from tests import _gitenv  # noqa: F401
 import json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 

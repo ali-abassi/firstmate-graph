@@ -16,8 +16,12 @@ from .paths import GRAPHS, REPO
 from .util import HelmError, log
 
 
+VENDORED_PIW = REPO / "vendor" / "pi-graph" / "bin" / "piw"
+
+
 def piw_bin() -> str:
-    return os.environ.get("HELM_PIW", "piw")
+    """The bundled pi-graph runner, unless HELM_PIW points elsewhere (tests use a stand-in)."""
+    return os.environ.get("HELM_PIW") or str(VENDORED_PIW)
 
 
 def render(graph: str, dest_dir: Path, *, cwd: Path, branch: str, project: dict,
